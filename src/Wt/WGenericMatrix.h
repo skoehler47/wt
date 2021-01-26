@@ -100,8 +100,8 @@ public:
   explicit WGenericMatrix(const T* elements)
   {
     if (elements) {
-      for(unsigned int i = 0; i < Rows; ++i)
-        for(unsigned int j = 0; j < Cols; ++j)
+      for(std::size_t i = 0; i < Rows; ++i)
+        for(std::size_t j = 0; j < Cols; ++j)
           at(i,j) = elements[i * Rows + j];
     }
   }
@@ -127,8 +127,8 @@ public:
    */
   void copyDataTo(T *data)
   {
-    for(unsigned int i = 0; i < Rows; ++i)
-      for (unsigned int j = 0; j < Cols; ++j)
+    for(std::size_t i = 0; i < Rows; ++i)
+      for (std::size_t j = 0; j < Cols; ++j)
         data[i * Rows + j] = at(i, j);
   }
 
@@ -164,8 +164,8 @@ public:
    */
   void fill(T value)
   {
-    for (unsigned i = 0; i < Rows; ++i)
-      for (unsigned j = 0; j < Cols; ++j)
+    for (std::size_t i = 0; i < Rows; ++i)
+      for (std::size_t j = 0; j < Cols; ++j)
         at(i,j) = value;
   }
 
@@ -178,8 +178,8 @@ public:
 #ifdef WT_GENERIC_MATRIX_USE_BOOST_UBLAS
     using namespace boost::numeric::ublas;
     identity_matrix<T> I(Rows > Cols ? Rows : Cols);
-    for(unsigned i = 0; i < Rows; ++i)
-      for (unsigned j = 0; j < Cols; ++j)
+    for(std::size_t i = 0; i < Rows; ++i)
+      for (std::size_t j = 0; j < Cols; ++j)
         if (m_(i, j) != I(i, j))
           return false;
     return true;
@@ -240,8 +240,8 @@ public:
    */
   bool operator==(const WGenericMatrix<T, Rows, Cols>& rhs) const
   {
-    for(unsigned i = 0; i < Rows; ++i)
-      for (unsigned j = 0; j < Cols; ++j)
+    for(std::size_t i = 0; i < Rows; ++i)
+      for (std::size_t j = 0; j < Cols; ++j)
         if (rhs(i, j) != at(i, j))
           return false;
     return true;
@@ -257,8 +257,7 @@ public:
 
   /*! \brief Returns the element at the given position
    */
-  const T &operator()(int row, int column) const
-  {
+  const T &operator()(std::size_t row, std::size_t column) const {
 #ifdef WT_GENERIC_MATRIX_USE_BOOST_UBLAS
     return m_(row, column);
 #else // !WT_GENERIC_MATRIX_USE_BOOST_UBLAS
@@ -268,7 +267,7 @@ public:
 
   /*! \brief Returns the element at the given position
    */
-  T &operator()(int row, int column) { 
+  T &operator()(std::size_t row, std::size_t column) {
 #ifdef WT_GENERIC_MATRIX_USE_BOOST_UBLAS
     return m_(row, column);
 #else // !WT_GENERIC_MATRIX_USE_BOOST_UBLAS
@@ -278,8 +277,7 @@ public:
 
   /*! \brief Returns the element at the given position
    */
-  const T &at(int row, int column) const
-  {
+  const T &at(std::size_t row, std::size_t column) const {
 #ifdef WT_GENERIC_MATRIX_USE_BOOST_UBLAS
     return m_(row, column);
 #else // !WT_GENERIC_MATRIX_USE_BOOST_UBLAS
@@ -289,7 +287,7 @@ public:
 
   /*! \brief Returns the element at the given position
    */
-  T &at(int row, int column) {
+  T &at(std::size_t row, std::size_t column) {
 #ifdef WT_GENERIC_MATRIX_USE_BOOST_UBLAS
     return m_(row, column);
 #else // !WT_GENERIC_MATRIX_USE_BOOST_UBLAS
