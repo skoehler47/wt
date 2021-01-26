@@ -209,7 +209,7 @@ namespace Wt {
       typedef std::input_iterator_tag iterator_category;
       typedef                       C value_type;
       typedef          std::ptrdiff_t difference_type;
-      typedef             value_type* pointer;
+      typedef             value_type *pointer;
       typedef             value_type& reference;
 
       /*! \brief Copy constructor.
