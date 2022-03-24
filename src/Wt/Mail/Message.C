@@ -4,6 +4,7 @@
  * See the LICENSE file for terms of use.
  */
 
+#include <algorithm>
 #include <iterator>
 #include <stdlib.h>
 
@@ -334,17 +335,17 @@ void Message::encodeQuotedPrintable(const WString& text, std::ostream& out)
     }
 
     if (eol) {
-      if (line.c_str()[0] == '.')
+      if (line[0] == '.')
         out << '.';
-      out << line.c_str() << "\r\n";
+      out << line.str() << "\r\n";
       line.clear();
     }
   }
 
   if (!line.empty()) {
-    if (line.c_str()[0] == '.')
+    if (line[0] == '.')
       out << '.';
-    out << line.c_str() << "\r\n";
+    out << line << "\r\n";
   }
 }
 
@@ -408,13 +409,13 @@ void Message::encodeWord(const WString& text, std::ostream& out,
         line << "?=";
         if (i != msg.length() - 1)
           line << "\r\n ";
-        out << line.c_str();
+        out << line;
         line.clear();
       }
     }
 
     if (!line.empty())
-      out << line.c_str() << "?=";
+      out << line << "?=";
   } else if (quoteIfNeeded && needQuote) {
     out << '"' << msg << '"';
   } else {
