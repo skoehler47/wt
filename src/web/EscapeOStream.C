@@ -244,11 +244,6 @@ EscapeOStream& EscapeOStream::operator<< (const EscapeOStream& other)
   return *this;
 }
 
-const char *EscapeOStream::c_str()
-{
-  return stream_.c_str();
-}
-
 std::string EscapeOStream::str() const
 {
   return stream_.str();
