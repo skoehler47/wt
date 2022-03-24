@@ -159,7 +159,7 @@ const std::string WColor::cssText(bool withAlpha) const
       }        else
         s << "rgb(" << red_ << ',' << green_ << ',' << blue_ << ')';
 
-      return s.c_str();
+      return s.str();
     }
   }
 }
