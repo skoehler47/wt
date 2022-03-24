@@ -61,7 +61,6 @@ public:
   EscapeOStream& operator<< (bool);
   EscapeOStream& operator<< (const EscapeOStream& other);
 
-  const char *c_str(); // for default constructor, can return 0
   std::string str() const; // for default constructor
 
   bool empty() const;

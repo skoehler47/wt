@@ -1010,7 +1010,7 @@ std::string DomElement::cssStyle() const
   if (styleProperty)
     style << *styleProperty;
 
-  return style.c_str();
+  return style.str();
 }
 
 void DomElement::setJavaScriptEvent(EscapeOStream& out,
