@@ -397,10 +397,10 @@ std::string WMessageResources::findCase(const std::vector<std::string> &cases,
     if (c < 0)
       error << " and values smaller than 0 are not allowed.";
     else
-      error << " which is greater than the list of cases (size="
-            << (int)cases.size() << ").";
-
-    throw WException(error.c_str());
+      error << " which is greater than the list of cases (size="   
+	    << (int)cases.size() << ").";
+    
+    throw WException(error.str());
   }
 
   return cases[c];
