@@ -86,6 +86,7 @@ public:
                   ", state: " << (stateE ? *stateE : "(empty)"));
         process_->setError(ERROR_MSG("invalid-state"));
         sendError(response);
+        process_->onOAuthDone();
         return;
       }
 
@@ -94,6 +95,7 @@ public:
         LOG_ERROR(ERROR_MSG(+ *errorE));
         process_->setError(ERROR_MSG(+ *errorE));
         sendError(response);
+        process_->onOAuthDone();
         return;
       }
 
@@ -102,6 +104,7 @@ public:
         LOG_ERROR(ERROR_MSG("missing-code"));
         process_->setError(ERROR_MSG("missing-code"));
         sendError(response);
+        process_->onOAuthDone();
         return;
       }
 
