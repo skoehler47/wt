@@ -49,7 +49,8 @@ void WebMain::run()
     }
 
   for (;;) {
-    bool haveMoreSessions = controller().expireSessions();
+    controller().expireSessions(true);
+    const bool haveMoreSessions = controller().sessionCount() > 0;
 
     if (!haveMoreSessions && !singleSessionId_.empty())
       break;
