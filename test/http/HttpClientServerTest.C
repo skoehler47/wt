@@ -638,7 +638,7 @@ BOOST_AUTO_TEST_CASE( application_expired_while_newid )
                     app->changeSessionId();
                   });
     std::this_thread::sleep_for(std::chrono::milliseconds(2100));
-    controller->expireSessions();
+    controller->expireSessions(true);
 
     t.join();
   }
