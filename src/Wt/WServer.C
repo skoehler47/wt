@@ -455,7 +455,8 @@ int WServer::waitForShutdown()
 
 bool WServer::expireSessions()
 {
-  return webController_->expireSessions();
+  webController_->expireSessions(true);
+  return webController_->sessionCount() > 0;
 }
 
 void WServer::scheduleStop()

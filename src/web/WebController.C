@@ -82,6 +82,11 @@ WebController::WebController(WServer& server,
   InitializeMagick(0);
 #endif
 
+#ifdef WT_THREADED
+  // initialize expiring_t to 'false'
+  expiring_.clear();
+#endif
+
   start();
 }
 
@@ -104,7 +109,8 @@ void WebController::shutdown()
 
     {
 #ifdef WT_THREADED
-      std::unique_lock<std::recursive_mutex> lock(mutex_);
+      /* write lock */
+      std::unique_lock<mutex_t> lock{ mutex_ };
 #endif // WT_THREADED
 
       running_ = false;
@@ -112,9 +118,9 @@ void WebController::shutdown()
       LOG_INFO_S(&server_, "shutdown: stopping " << sessions_.size()
                  << " sessions.");
 
-      for (SessionMap::iterator i = sessions_.begin(); i != sessions_.end();
-           ++i)
-        sessionList.push_back(i->second);
+      for (auto s : sessions_) {
+        sessionList.push_back(s.second);
+      }
 
       sessions_.clear();
 
@@ -122,8 +128,7 @@ void WebController::shutdown()
       plainHtmlSessions_ = 0;
     }
 
-    for (unsigned i = 0; i < sessionList.size(); ++i) {
-      std::shared_ptr<WebSession> session = sessionList[i];
+    for (auto& session : sessionList) {
       WebSession::Handler handler(session,
                                   WebSession::Handler::LockOption::TakeLock);
       session->expire();
@@ -139,9 +144,6 @@ void WebController::shutdown()
 
 void WebController::sessionDeleted()
 {
-#ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
-#endif // WT_THREADED
   --zombieSessions_;
 }
 
@@ -158,7 +160,8 @@ const Configuration& WebController::configuration() const
 int WebController::sessionCount() const
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
+  /* read lock */
+  std::shared_lock<mutex_t> lock{ mutex_ };
 #endif
   return sessions_.size();
 }
@@ -166,78 +169,90 @@ int WebController::sessionCount() const
 std::vector<std::string> WebController::sessions(bool onlyRendered)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
+  /* read lock */
+  std::shared_lock<mutex_t> lock{ mutex_ };
 #endif
   std::vector<std::string> sessionIds;
   for (SessionMap::const_iterator i = sessions_.begin(); i != sessions_.end(); ++i) {
-    if (!onlyRendered || i->second->app() != nullptr)
+    if (!onlyRendered || i->second->app() != nullptr) {
       sessionIds.push_back(i->first);
+    }
   }
   return sessionIds;
 }
 
-bool WebController::expireSessions()
+void WebController::expireSessions(bool force)
 {
-  std::vector<std::shared_ptr<WebSession>> toExpire;
-
-  bool result;
-  {
-    Time now;
-
 #ifdef WT_THREADED
-    std::unique_lock<std::recursive_mutex> lock(mutex_);
+  if (!expiring_.test_and_set() || force) {
+  // check 'force' last to ensure 'expiring_' flag gets properly set
 #endif // WT_THREADED
 
-    for (SessionMap::iterator i = sessions_.begin(); i != sessions_.end(); ++i) {
-      std::shared_ptr<WebSession> session = i->second;
+    std::vector<std::shared_ptr<WebSession>> toExpire;
+    {
+      Time now;
 
-      int diff = session->expireTime() - now;
+#ifdef WT_THREADED
+      /* read lock */
+      std::shared_lock<mutex_t> lock{ mutex_ };
+#endif // WT_THREADED
 
-      if (diff < 1000 && configuration().sessionTimeout() != -1) {
-        toExpire.push_back(session);
-        // Note: the session is not yet removed from sessions_ map since
-        // we want to grab the UpdateLock to do this and grabbing it here
-        // might cause a deadlock.
+      for (const auto& s : sessions_) {
+        const int diff = s.second->expireTime() - now;
+        if (diff < 1000 && configuration().sessionTimeout() != -1) {
+          toExpire.push_back(s.second);
+          // Note: the session is not yet removed from sessions_ map since
+          // we want to grab the UpdateLock to do this and grabbing it here
+          // might cause a deadlock.
+        }
       }
     }
 
-    result = !sessions_.empty();
-  }
+    for(auto& session : toExpire) {
 
-  for (unsigned i = 0; i < toExpire.size(); ++i) {
-    std::shared_ptr<WebSession> session = toExpire[i];
-
-    LOG_INFO_S(session, "timeout: expiring");
-    WebSession::Handler handler(session,
-                                WebSession::Handler::LockOption::TakeLock);
+      LOG_INFO_S(session, "timeout: expiring");
+      WebSession::Handler handler(session,
+                                  WebSession::Handler::LockOption::TakeLock);
 
 #ifdef WT_THREADED
-    std::unique_lock<std::recursive_mutex> lock(mutex_);
+      /* write lock */
+      std::unique_lock<mutex_t> lock{ mutex_ };
 #endif // WT_THREADED
 
-    // Another thread might have already removed it
-    if (sessions_.find(session->sessionId()) == sessions_.end())
-      continue;
+    // try to delete session from session map; return
+    // value will be 0 if element is not found (e.g.
+    // if already deleted by another thread), skip
+    // expiring session in this case
+      if (sessions_.erase(session->sessionId()) == 0) {
+        continue;
+      }
 
-    if (session->env().ajax())
-      --ajaxSessions_;
-    else
-      --plainHtmlSessions_;
+#ifdef WT_THREADED
+      lock.unlock();
+#endif // WT_THREADED
 
-    ++zombieSessions_;
+      if (session->env().ajax()) {
+        --ajaxSessions_;
+      } else {
+        --plainHtmlSessions_;
+      }
 
-    sessions_.erase(session->sessionId());
+      ++zombieSessions_;
 
-    session->expire();
+      session->expire();
+    }
+
+#ifdef WT_THREADED
+    expiring_.clear();
   }
-
-  return result;
+#endif  // WT_THREADED
 }
 
 void WebController::addSession(const std::shared_ptr<WebSession>& session)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
+  /* write lock */
+  std::unique_lock<mutex_t> lock{ mutex_ };
 #endif // WT_THREADED
 
   sessions_[session->sessionId()] = session;
@@ -245,23 +260,30 @@ void WebController::addSession(const std::shared_ptr<WebSession>& session)
 
 void WebController::removeSession(const std::string& sessionId)
 {
-#ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
-#endif // WT_THREADED
-
   LOG_INFO("Removing session " << sessionId);
 
-  SessionMap::iterator i = sessions_.find(sessionId);
+#ifdef WT_THREADED
+  /* write lock */
+  std::unique_lock<mutex_t> lock{ mutex_ };
+#endif // WT_THREADED
+
+  SessionMap::const_iterator i = sessions_.find(sessionId);
   if (i != sessions_.end()) {
     ++zombieSessions_;
-    if (i->second->env().ajax())
+    if (i->second->env().ajax()) {
       --ajaxSessions_;
-    else
+    } else {
       --plainHtmlSessions_;
+    }
     sessions_.erase(i);
   }
+  const bool sessionsEmpty = sessions_.empty();
 
-  if (server_.dedicatedSessionProcess() && sessions_.size() == 0) {
+#ifdef WT_THREADED
+  lock.unlock();
+#endif // WT_THREADED
+
+  if (server_.dedicatedSessionProcess() && sessionsEmpty) {
     server_.scheduleStop();
   }
 }
@@ -370,12 +392,14 @@ void WebController::socketSelected(int descriptor, WSocketNotifier::Type type)
    */
   std::string sessionId;
   {
-    std::unique_lock<std::recursive_mutex> lock(notifierMutex_);
-
     SocketNotifierMap &notifiers = socketNotifiers(type);
+    
+    /* read lock */
+    std::shared_lock<mutex_t> lock{ notifierMutex_ };
+    
     SocketNotifierMap::iterator k = notifiers.find(descriptor);
-
     if (k == notifiers.end()) {
+      lock.unlock();
       LOG_ERROR_S(&server_, "socketSelected(): socket notifier should have been "
                   "cancelled?");
 
@@ -395,8 +419,11 @@ void WebController::socketNotify(int descriptor, WSocketNotifier::Type type)
 {
   WSocketNotifier *notifier = nullptr;
   {
-    std::unique_lock<std::recursive_mutex> lock(notifierMutex_);
     SocketNotifierMap &notifiers = socketNotifiers(type);
+
+    /* write lock */
+    std::unique_lock<mutex_t> lock{ notifierMutex_ };
+
     SocketNotifierMap::iterator k = notifiers.find(descriptor);
     if (k != notifiers.end()) {
       notifier = k->second;
@@ -404,8 +431,9 @@ void WebController::socketNotify(int descriptor, WSocketNotifier::Type type)
     }
   }
 
-  if (notifier)
+  if (notifier) {
     notifier->notify();
+  }
 }
 #endif // WT_THREADED
 
@@ -413,8 +441,12 @@ void WebController::addSocketNotifier(WSocketNotifier *notifier)
 {
 #ifdef WT_THREADED
   {
-    std::unique_lock<std::recursive_mutex> lock(notifierMutex_);
-    socketNotifiers(notifier->type())[notifier->socket()] = notifier;
+    SocketNotifierMap& notifiers = socketNotifiers(notifier->type());
+    
+    /* write lock */
+    std::unique_lock<mutex_t> lock{ notifierMutex_ };
+    
+    notifiers[notifier->socket()] = notifier;
   }
 
   switch (notifier->type()) {
@@ -446,12 +478,15 @@ void WebController::removeSocketNotifier(WSocketNotifier *notifier)
     break;
   }
 
-  std::unique_lock<std::recursive_mutex> lock(notifierMutex_);
-
   SocketNotifierMap &notifiers = socketNotifiers(notifier->type());
+
+  /* write lock */
+  std::unique_lock<mutex_t> lock{ notifierMutex_ };
+
   SocketNotifierMap::iterator i = notifiers.find(notifier->socket());
-  if (i != notifiers.end())
+  if (i != notifiers.end()) {
     notifiers.erase(i);
+  }
 #endif // WT_THREADED
 }
 
@@ -459,12 +494,14 @@ bool WebController::requestDataReceived(WebRequest *request,
                                         std::uintmax_t current,
                                         std::uintmax_t total)
 {
-#ifdef WT_THREADED
-  std::unique_lock<std::mutex> lock(uploadProgressUrlsMutex_);
-#endif // WT_THREADED
-
-  if (!running_)
+  if (!running_) {
     return false;
+  }
+
+#ifdef WT_THREADED
+  /* read lock */
+  std::shared_lock<mutex_t> lock{ uploadProgressUrlsMutex_ };
+#endif // WT_THREADED
 
   if (uploadProgressUrls_.find(request->queryString())
       != uploadProgressUrls_.end()) {
@@ -482,8 +519,9 @@ bool WebController::requestDataReceived(WebRequest *request,
     }
 
     const std::string *wtdE = request->getParameter("wtd");
-    if (!wtdE)
+    if (!wtdE) {
       return false;
+    }
 
     std::string sessionId = *wtdE;
 
@@ -496,13 +534,14 @@ bool WebController::requestDataReceived(WebRequest *request,
       total
     };
     auto event = std::make_shared<ApplicationEvent>(sessionId,
-                                                    std::bind(&WebController::updateResourceProgress,
-                                                              this, params));
+      std::bind(&WebController::updateResourceProgress,
+        this, std::move(params)));
 
-    if (handleApplicationEvent(event))
+    if (handleApplicationEvent(event)) {
       return !request->postDataExceeded();
-    else
+    } else {
       return false;
+    }
   }
 
   return true;
@@ -545,21 +584,24 @@ bool WebController::handleApplicationEvent(const std::shared_ptr<ApplicationEven
   std::shared_ptr<WebSession> session;
   {
 #ifdef WT_THREADED
-    std::unique_lock<std::recursive_mutex> lock(mutex_);
+    /* read lock */
+    std::shared_lock<mutex_t> lock{ mutex_ };
 #endif // WT_THREADED
 
     SessionMap::iterator i = sessions_.find(event->sessionId);
-
-    if (i != sessions_.end() && !i->second->dead())
+    if (i != sessions_.end() && !i->second->dead()) {
       session = i->second;
+    }
   }
 
   if (!session) {
-    if (event->fallbackFunction)
+    if (event->fallbackFunction) {
       event->fallbackFunction();
+    }
     return false;
-  } else
+  } else {
     session->queueEvent(event);
+  }
 
   /*
    * Try to take the session lock now to propagate the event to the
@@ -575,7 +617,8 @@ bool WebController::handleApplicationEvent(const std::shared_ptr<ApplicationEven
 void WebController::addUploadProgressUrl(const std::string& url)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::mutex> lock(uploadProgressUrlsMutex_);
+  /* write lock */
+  std::unique_lock<mutex_t> lock{ uploadProgressUrlsMutex_ };
 #endif // WT_THREADED
 
   uploadProgressUrls_.insert(url.substr(url.find("?") + 1));
@@ -584,7 +627,8 @@ void WebController::addUploadProgressUrl(const std::string& url)
 void WebController::removeUploadProgressUrl(const std::string& url)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::mutex> lock(uploadProgressUrlsMutex_);
+  /* write lock */
+  std::unique_lock<mutex_t> lock{ uploadProgressUrlsMutex_ };
 #endif // WT_THREADED
 
   uploadProgressUrls_.erase(url.substr(url.find("?") + 1));
@@ -731,10 +775,6 @@ void WebController::handleRequest(WebRequest *request)
 
   std::shared_ptr<WebSession> session;
   {
-#ifdef WT_THREADED
-    std::unique_lock<std::recursive_mutex> lock(mutex_);
-#endif // WT_THREADED
-
     if (!singleSessionId_.empty() && sessionId != singleSessionId_) {
       if (conf_.persistentSessions()) {
         // This may be because of a race condition in the filesystem:
@@ -753,22 +793,44 @@ void WebController::handleRequest(WebRequest *request)
                    "persistent session requested Id: " << sessionId << ", "
                    << "persistent Id: " << singleSessionId_);
 
-        if (sessions_.empty() || strcmp(request->requestMethod(), "GET") == 0)
+#ifdef WT_THREADED
+        /* read lock */
+        std::shared_lock<mutex_t> lock{ mutex_ };
+#endif // WT_THREADED
+    
+        const bool sessionsEmpty = sessions_.empty();
+
+#ifdef WT_THREADED
+        lock.unlock();
+#endif // WT_THREADED
+
+        if (sessionsEmpty || strcmp(request->requestMethod(), "GET") == 0) {
           sessionId = singleSessionId_;
-      } else
+        }
+      } else {
         sessionId = singleSessionId_;
+      }
     }
 
-    SessionMap::iterator i = sessions_.find(sessionId);
+#ifdef WT_THREADED
+    /* read lock */
+    std::shared_lock<mutex_t> lock{ mutex_ };
+#endif // WT_THREADED
+
+    SessionMap::const_iterator i = sessions_.find(sessionId);
+    session = (i != std::end(sessions_)) ? i->second : nullptr;
+
+#ifdef WT_THREADED
+    lock.unlock();
+#endif // WT_THREADED
 
     Configuration::SessionTracking sessionTracking = configuration().sessionTracking();
 
-    if (i == sessions_.end() || i->second->dead() ||
+    if (!session || session->dead() ||
         (sessionTracking == Configuration::Combined &&
-         (multiSessionCookie.empty() || multiSessionCookie != i->second->multiSessionId()))) {
+         (multiSessionCookie.empty() || multiSessionCookie != session->multiSessionId()))) {
       try {
-        if (sessionTracking == Configuration::Combined &&
-            i != sessions_.end() && !i->second->dead()) {
+        if (sessionTracking == Configuration::Combined && session && !session->dead()) {
           if (!request->headerValue("Cookie")) {
             LOG_ERROR_S(&server_, "Valid session id: " << sessionId << ", but "
                         "no cookie received (expecting multi session cookie)");
@@ -790,35 +852,43 @@ void WebController::handleRequest(WebRequest *request)
         if (singleSessionId_.empty()) {
           do {
             sessionId = conf_.generateSessionId();
-            if (!conf_.registerSessionId(std::string(), sessionId))
-              sessionId.clear();
-          } while (sessionId.empty());
+          } while (!conf_.registerSessionId(std::string(), sessionId));
         }
 
         std::string favicon = request->entryPoint_->favicon();
-        if (favicon.empty())
+        if (favicon.empty()) {
           conf_.readConfigurationProperty("favicon", favicon);
+        }
 
-        session.reset(new WebSession(this, sessionId,
-                                     request->entryPoint_->type(),
-                                     favicon, request));
+        session = std::make_shared<WebSession>(this, sessionId,
+          request->entryPoint_->type(),
+          favicon, request);
 
         if (sessionTracking == Configuration::Combined) {
-          if (multiSessionCookie.empty())
+          if (multiSessionCookie.empty()) {
             multiSessionCookie = conf_.generateSessionId();
+          }
           session->setMultiSessionId(multiSessionCookie);
         }
 
-        if (sessionTracking == Configuration::CookiesURL)
-	  request->addHeader("Set-Cookie",
-			     appSessionCookie(request->scriptName())
-			     + "=" + sessionId + "; Version=1;"
-			     + " Path=" + session->env().deploymentPath()
-			     + "; httponly;" + (session->env().urlScheme() == "https" ? " secure;" : "")
-                             + " SameSite=Strict;");
+        if (sessionTracking == Configuration::CookiesURL) {
+            request->addHeader("Set-Cookie",
+                appSessionCookie(request->scriptName())
+                + "=" + sessionId + "; Version=1;"
+                + " Path=" + session->env().deploymentPath()
+                + "; httponly;" + (session->env().urlScheme() == "https" ? " secure;" : "")
+                + " SameSite=Strict;");
+        }
 
-        sessions_[sessionId] = session;
-        ++plainHtmlSessions_;
+        {
+#ifdef WT_THREADED
+          /* write lock */
+          std::unique_lock<mutex_t> lock{ mutex_ };
+#endif // WT_THREADED
+
+          sessions_[sessionId] = session;
+          ++plainHtmlSessions_;
+        }
 
         if (server_.dedicatedSessionProcess()) {
           server_.updateProcessSessionId(sessionId);
@@ -828,8 +898,6 @@ void WebController::handleRequest(WebRequest *request)
         request->flush(WebResponse::ResponseState::ResponseDone);
         return;
       }
-    } else {
-      session = i->second;
     }
   }
 
@@ -843,16 +911,20 @@ void WebController::handleRequest(WebRequest *request)
     }
   }
 
-  if (session->dead())
+  if (session->dead()) {
     removeSession(sessionId);
+  }
 
+  // release session co-ownership
   session.reset();
 
-  if (autoExpire_)
-    expireSessions();
+  if (autoExpire_) {
+    expireSessions(false);
+  }
 
-  if (!handled)
+  if (!handled) {
     handleRequest(request);
+  }
 }
 
 void WebController::handleRedirect(Wt::WebRequest *request)
@@ -897,52 +969,48 @@ EntryPointMatch WebController::getEntryPoint(WebRequest *request)
 std::string
 WebController::generateNewSessionId(const std::shared_ptr<WebSession>& session)
 {
-#ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
-#endif // WT_THREADED
-
   std::string newSessionId;
   do {
     newSessionId = conf_.generateSessionId();
-    if (!conf_.registerSessionId(session->sessionId(), newSessionId))
-      newSessionId.clear();
-  } while (newSessionId.empty());
+  } while (!conf_.registerSessionId(session->sessionId(), newSessionId));
+
+#ifdef WT_THREADED
+  /* write lock */
+  std::unique_lock<mutex_t> lock{ mutex_ };
+#endif // WT_THREADED
 
   sessions_[newSessionId] = session;
 
   SessionMap::iterator i = sessions_.find(session->sessionId());
   sessions_.erase(i);
 
-  if (!singleSessionId_.empty())
+#ifdef WT_THREADED
+  lock.unlock();
+#endif // WT_THREADED
+
+  if (!singleSessionId_.empty()) {
     singleSessionId_ = newSessionId;
+  }
 
   return newSessionId;
 }
 
 void WebController::newAjaxSession()
 {
-#ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(mutex_);
-#endif // WT_THREADED
-
-  --plainHtmlSessions_;
   ++ajaxSessions_;
+  --plainHtmlSessions_;
 }
 
 bool WebController::limitPlainHtmlSessions()
 {
   if (conf_.maxPlainSessionsRatio() > 0) {
-#ifdef WT_THREADED
-    std::unique_lock<std::recursive_mutex> lock(mutex_);
-#endif // WT_THREADED
+    const int plainSessions = plainHtmlSessions_;
+    const int ajaxSessions = ajaxSessions_;
+    return (plainSessions + ajaxSessions > 20)
+      && (plainSessions > conf_.maxPlainSessionsRatio() * (ajaxSessions + plainSessions));
+  }
 
-    if (plainHtmlSessions_ + ajaxSessions_ > 20)
-      return plainHtmlSessions_ > conf_.maxPlainSessionsRatio()
-        * (ajaxSessions_ + plainHtmlSessions_);
-    else
-      return false;
-  } else
-    return false;
+  return false;
 }
 
 }
