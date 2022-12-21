@@ -116,18 +116,6 @@ public:
    */
   bool isReadOnly() const;
 
-  /*! \brief Sets the placeholder text.
-   *
-   * This sets the text that is shown when the field is empty.
-   */
-  virtual void setPlaceholderText(const WString& placeholder);
-
-  /*! \brief Returns the placeholder text.
-   *
-   * \sa setPlaceholderText()
-   */
-  const WString& placeholderText() const { return emptyText_; }
-
   /*! \brief %Signal emitted when the value was changed.
    *
    * For a keyboard input, the signal is only emitted when the focus is lost
@@ -163,6 +151,18 @@ protected:
   void applyEmptyText();
 
   virtual void enableAjax() override;
+
+  /*! \brief Sets the placeholder text.
+   *
+   * This sets the text that is shown when the field is empty.
+   */
+  virtual void setPlaceholderText(const WString& placeholder);
+
+  /*! \brief Returns the placeholder text.
+   *
+   * \sa setPlaceholderText()
+   */
+  const WString& placeholderText() const { return emptyText_; }
 
   /*! \internal
    * \brief Called whenever the validator is changed
