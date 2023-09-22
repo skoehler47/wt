@@ -280,8 +280,9 @@ void WBootstrap5Theme::apply(WWidget *widget, DomElement& element,
       }
     }
 
-    if (element.getAttribute("href").empty() &&
-        element.getProperty(Property::Class).empty())
+    if ((element.getAttribute("href").empty() ||
+        element.getAttribute("href") == "#") &&
+        element.getProperty(Property::Class) == WInteractWidget::noDefault)
       element.addPropertyWord(Property::Class, "dropdown-item");
 
     break;
