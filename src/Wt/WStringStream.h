@@ -361,7 +361,7 @@ namespace Wt {
 
       void flushSink();
 
-      friend std::ostream& operator<<(std::ostream& os, const WStringStream& s);
+      friend WT_STRINGSTREAM_API std::ostream& operator<<(std::ostream& os, const WStringStream& s);
     };
 
     /*!
