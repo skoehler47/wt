@@ -66,3 +66,22 @@ RUN apt-get update \
  && rm -rf libharu-RELEASE_2_3_0 \
  && rm haru.zip \
  && rm -rf /var/lib/apt/lists/*
+
+ RUN apt-get update \
+     && apt-get install python3-pip --no-install-recommends -y \
+     && python3 -m pip install trio \
+     && python3 -m pip install selenium \
+     && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+     && apt-get install ./google-chrome-stable_current_amd64.deb --no-install-recommends -y \
+     && apt-get install --no-install-recommends -y \
+     unzip \
+ && mkdir -p /opt/tinymce/3 /opt/tinymce/4 \
+ && wget http://download.tiny.cloud/tinymce/community/tinymce_4.9.11.zip -O /opt/tinymce/4/tinymce.zip \
+ && unzip /opt/tinymce/4/tinymce.zip -d /opt/tinymce/4 \
+ && rm /opt/tinymce/4/tinymce.zip \
+ && wget http://download.tiny.cloud/tinymce/community/tinymce_3.5.12.zip -O /opt/tinymce/3/tinymce.zip \
+ && unzip /opt/tinymce/3/tinymce.zip -d /opt/tinymce/3 \
+ && rm /opt/tinymce/3/tinymce.zip \
+ && apt-get -y remove unzip \
+ && rm -rf /var/lib/apt/lists/*
+

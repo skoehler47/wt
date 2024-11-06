@@ -9,6 +9,13 @@ def host_ccache_dir
 
 def thread_count = 10
 
+// Remember the last Gitlab stage that was touched
+// This is used to ensure that pipelines are always properly "closed" in Gitlab
+// Such that they do not indefinitely remain in "Running".
+// This is a "hack" necessary in declarative pipelines, since the "gitlabBuilds"
+// command does not correctly push all initial stages.
+def last_gitlab_stage
+
 node('docker') {
     user_id = sh(returnStdout: true, script: 'id -u').trim()
     user_name = sh(returnStdout: true, script: 'id -un').trim()
@@ -59,7 +66,12 @@ pipeline {
         disableConcurrentBuilds abortPrevious: true
 
         gitLabConnection('Gitlab')
-        gitlabBuilds(builds: ['Format JavaScript', 'Build - Single Threaded', 'Build - Multi Threaded', 'Tests', 'Tests - Sqlite3', 'Wt Port - Checkout', 'Wt Port - Config', 'Wt Port - TinyMCE', 'Wt Port - CNOR', 'Wt Port - Java Build', 'Wt Port - Java Test'])
+        // See https://github.com/jenkinsci/gitlab-plugin/issues/1028
+        // These stages are not all initially pushed to Gitlab, which they SHOULD be.
+        // As such, Gitlab will consider the whole pipeline a success if the latest stage it sees is successful.
+        // Only after this "success" will the new 'running' stage be seen.
+        // "Set to merge on pipeline success" then suffers from prematurely merging the branch.
+        gitlabBuilds(builds: ['Overarching Pipeline', 'Format JavaScript', 'Build - Single Threaded', 'Build - Multi Threaded', 'Tests', 'Tests - Sqlite3', 'Wt Port - Checkout', 'Wt Port - Config', 'Wt Port - TinyMCE', 'Wt Port - CNOR', 'Wt Port - Java Build', 'Wt Port - Java Test'])
     }
     // Start without an agent, and define the agent per each stage.
     // This is done to ensure that wt and wt-port use different dockerfiles.
@@ -84,6 +96,10 @@ pipeline {
                     stages {
                         stage('pnpm install') {
                             steps {
+                                script {
+                                    last_gitlab_stage = "Format JavaScript"
+                                }
+                                updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'running'
                                 updateGitlabCommitStatus name: 'Format JavaScript', state: 'running'
                                 dir('src/js') {
                                     sh '''#!/bin/bash
@@ -124,10 +140,16 @@ pipeline {
                         success {
                             updateGitlabCommitStatus name: 'Format JavaScript', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Format JavaScript', state: 'canceled'
+                        }
                     }
                 }
                 stage('Building application - Single threaded') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Build - Single Threaded"
+                        }
                         updateGitlabCommitStatus name: 'Build - Single Threaded', state: 'running'
                         dir('build-st') {
                             wt_configure(mt: 'OFF')
@@ -142,10 +164,16 @@ pipeline {
                         success {
                             updateGitlabCommitStatus name: 'Build - Single Threaded', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Build - Single Threaded', state: 'canceled'
+                        }
                     }
                 }
                 stage('Building application - Multi threaded') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Build - Multi Threaded"
+                        }
                         updateGitlabCommitStatus name: 'Build - Multi Threaded', state: 'running'
                         dir('build-mt') {
                             wt_configure(mt: 'ON')
@@ -160,10 +188,16 @@ pipeline {
                         success {
                             updateGitlabCommitStatus name: 'Build - Multi Threaded', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Build - Multi Threaded', state: 'canceled'
+                        }
                     }
                 }
                 stage('Tests') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Tests"
+                        }
                         updateGitlabCommitStatus name: 'Tests', state: 'running'
                         dir('test') {
                             warnError('st test.wt failed') {
@@ -183,10 +217,19 @@ pipeline {
                         success {
                             updateGitlabCommitStatus name: 'Tests', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Tests', state: 'canceled'
+                        }
+                        unstable {
+                            updateGitlabCommitStatus name: 'Tests', state: 'failed'
+                        }
                     }
                 }
                 stage('Test SQLite3') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Tests - Sqlite3"
+                        }
                         updateGitlabCommitStatus name: 'Tests - Sqlite3', state: 'running'
                         dir('test') {
                             warnError('st test.sqlite3 failed') {
@@ -206,22 +249,40 @@ pipeline {
                         success {
                             updateGitlabCommitStatus name: 'Tests - Sqlite3', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Tests - Sqlite3', state: 'canceled'
+                        }
+                        unstable {
+                            updateGitlabCommitStatus name: 'Tests - Sqlite3', state: 'failed'
+                        }
                     }
                 }
             }
             post {
                 always {
                     junit allowEmptyResults: true, testResults: '*_test_log.xml'
+                    script {
+                        // Specific case to detect superseded builds.
+                        if (currentBuild.currentResult == 'NOT_BUILT') {
+                          updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'canceled'
+                          updateGitlabCommitStatus name: "${last_gitlab_stage}", state: 'canceled'
+                        }
+                    }
                 }
                 cleanup {
                     cleanWs()
                 }
+                aborted {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'canceled'
+                }
                 failure {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'failed'
                     mail to: env.EMAIL,
                          subject: "Failed Pipeline (wt step): ${currentBuild.fullDisplayName}",
                          body: "Something is wrong with ${env.BUILD_URL}"
                 }
                 unstable {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'failed'
                     mail to: env.EMAIL,
                          subject: "Unstable Pipeline (wt step): ${currentBuild.fullDisplayName}",
                          body: "Something is wrong with ${env.BUILD_URL}"
@@ -243,6 +304,9 @@ pipeline {
             stages {
                 stage('Wt-port Checkout') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Wt Port - Checkout"
+                        }
                         updateGitlabCommitStatus name: 'Wt Port - Checkout', state: 'running'
                         script {
                             // Checks out master by default.
@@ -276,10 +340,16 @@ pipeline {
                         success {
                             updateGitlabCommitStatus name: 'Wt Port - Checkout', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Wt Port - Checkout', state: 'canceled'
+                        }
                     }
                 }
                 stage('Config') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Wt Port - Config"
+                        }
                         updateGitlabCommitStatus name: 'Wt Port - Config', state: 'running'
                         dir('wt-port/java') {
                             sh """cat > Config << EOF
@@ -297,10 +367,16 @@ EOF"""
                         success {
                             updateGitlabCommitStatus name: 'Wt Port - Config', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Wt Port - Config', state: 'canceled'
+                        }
                     }
                 }
                 stage('CNOR') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Wt Port - CNOR"
+                        }
                         updateGitlabCommitStatus name: 'Wt Port - CNOR', state: 'running'
                         // While this CAN be build with multiple threads it is generally a bad idea, as it is likely to fail at least once then.
                         // The issue is that some of the grammar is build on-demand, and then used as an include.
@@ -318,12 +394,18 @@ EOF"""
                         success {
                             updateGitlabCommitStatus name: 'Wt Port - CNOR', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Wt Port - CNOR', state: 'canceled'
+                        }
                     }
                 }
                 // This step is necessary since the Makefile requires it.
                 // This ought to be moved to a different step.
                 stage('Copy TinyMCE') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Wt Port - TinyMCE"
+                        }
                         updateGitlabCommitStatus name: 'Wt Port - TinyMCE', state: 'running'
                         sh "cp -r /opt/tinymce/3/tinymce/jscripts/tiny_mce ${env.WORKSPACE}/resources/"
                         sh "cp -r /opt/tinymce/4/tinymce/js/tinymce ${env.WORKSPACE}/resources/"
@@ -335,10 +417,16 @@ EOF"""
                         success {
                             updateGitlabCommitStatus name: 'Wt Port - TinyMCE', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Wt Port - TinyMCE', state: 'canceled'
+                        }
                     }
                 }
                 stage('Clean-dist') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Wt Port - Java Build"
+                        }
                         updateGitlabCommitStatus name: 'Wt Port - Java Build', state: 'running'
                         dir('wt-port/java') {
                             sh "make clean-dist -j${thread_count}"
@@ -354,10 +442,16 @@ EOF"""
                         success {
                             updateGitlabCommitStatus name: 'Wt Port - Java Build', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Wt Port - Java Build', state: 'canceled'
+                        }
                     }
                 }
                 stage('Test') {
                     steps {
+                        script {
+                            last_gitlab_stage = "Wt Port - Java Test"
+                        }
                         updateGitlabCommitStatus name: 'Wt Port - Java Test', state: 'running'
                         dir('wt-port/java') {
                             warnError('tests failed') {
@@ -372,22 +466,43 @@ EOF"""
                         success {
                             updateGitlabCommitStatus name: 'Wt Port - Java Test', state: 'success'
                         }
+                        aborted {
+                            updateGitlabCommitStatus name: 'Wt Port - Java Test', state: 'canceled'
+                        }
+                        unstable {
+                            updateGitlabCommitStatus name: 'Wt Port - Java Test', state: 'failed'
+                        }
                     }
                 }
             }
             post {
+                success {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'success'
+                }
+                aborted {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'canceled'
+                }
                 always {
                     junit allowEmptyResults: true, testResults: 'wt-port/java/report/TEST-eu.webtoolkit.jwt*.xml'
+                    script {
+                        // Specific case to detect superseded builds.
+                        if (currentBuild.currentResult == 'NOT_BUILT') {
+                          updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'canceled'
+                          updateGitlabCommitStatus name: "${last_gitlab_stage}", state: 'canceled'
+                        }
+                    }
                 }
                 cleanup {
                     cleanWs()
                 }
                 failure {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'failed'
                     mail to: env.EMAIL,
                          subject: "Failed Pipeline (wt-port step): ${currentBuild.fullDisplayName}",
                          body: "Something is wrong with ${env.BUILD_URL}"
                 }
                 unstable {
+                    updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'failed'
                     mail to: env.EMAIL,
                          subject: "Unstable Pipeline (wt-port step): ${currentBuild.fullDisplayName}",
                          body: "Something is wrong with ${env.BUILD_URL}"

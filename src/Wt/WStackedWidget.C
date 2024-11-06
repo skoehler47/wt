@@ -29,6 +29,8 @@ WStackedWidget::WStackedWidget()
 void WStackedWidget::addWidget(std::unique_ptr<WWidget> widget)
 {
   WContainerWidget::addWidget(std::move(widget));
+  int index = count() - 1;
+  loadPolicies_.insert(loadPolicies_.begin() + index, ContentLoading::Eager);
 
   if (currentIndex_ == -1)
     currentIndex_ = 0;
@@ -52,6 +54,7 @@ WWidget *WStackedWidget::currentWidget() const
 void WStackedWidget::insertWidget(int index, std::unique_ptr<WWidget> widget)
 {
   WContainerWidget::insertWidget(index, std::move(widget));
+  loadPolicies_.insert(loadPolicies_.begin() + index, ContentLoading::Eager);
 
   if (currentIndex_ == -1)
     currentIndex_ = 0;
@@ -61,7 +64,9 @@ void WStackedWidget::insertWidget(int index, std::unique_ptr<WWidget> widget)
 
 std::unique_ptr<WWidget> WStackedWidget::removeWidget(WWidget *widget)
 {
+  int index = indexOf(widget);
   auto result = WContainerWidget::removeWidget(widget);
+  loadPolicies_.erase(loadPolicies_.begin() + index);
 
   if (currentIndex_ >= count()) {
     if (count() > 0)
@@ -96,7 +101,7 @@ void WStackedWidget::setCurrentIndex(int index, const WAnimation& animation,
                                      bool autoReverse)
 {
   if (!animation.empty() &&
-      WApplication::instance()->environment().supportsCss3Animations() &&
+    WApplication::instance()->environment().supportsCss3Animations() &&
       ((isRendered() && javaScriptDefined_) || !canOptimizeUpdates())) {
     if (canOptimizeUpdates() && index == currentIndex_)
       return;
@@ -127,6 +132,17 @@ void WStackedWidget::setCurrentIndex(int index, const WAnimation& animation,
     if (currentIndex_ >= 0 && isRendered() && javaScriptDefined_)
       doJavaScript(jsRef() + ".wtObj.setCurrent("
                    + widget(currentIndex_)->jsRef() + ");");
+  }
+
+  if (loadPolicies_[currentIndex_] == ContentLoading::Lazy) {
+    WContainerWidget* container = dynamic_cast<WContainerWidget*>(currentWidget());
+
+    // If the container is empty, the content is not yet loaded. We rely on the function calling this one to emit the signal.
+    if (container->count()) {
+      currentWidgetChanged().emit(container->widget(0)); 
+    }
+  } else {
+    currentWidgetChanged().emit(currentWidget());
   }
 }
 
@@ -201,6 +217,11 @@ void WStackedWidget::getDomChanges(std::vector<DomElement *>& result,
                                    WApplication *app)
 {
   WContainerWidget::getDomChanges(result, app);
+}
+
+void WStackedWidget::setLoadPolicy(int index, ContentLoading loadPolicy)
+{
+  loadPolicies_[index] = loadPolicy;
 }
 
 }

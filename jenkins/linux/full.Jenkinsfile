@@ -135,9 +135,60 @@ pipeline {
                 }
             }
         }
+        stage('Copy TinyMCE') {
+            steps {
+                sh "cp -r /opt/tinymce/3/tinymce/jscripts/tiny_mce ${env.WORKSPACE}/resources/"
+                sh "cp -r /opt/tinymce/4/tinymce/js/tinymce ${env.WORKSPACE}/resources/"
+            }
+        }
+        stage('Pull Git master') {
+            steps {
+                sh 'git checkout master'
+                sh "git checkout ${env.BRANCH_NAME}"
+            }
+        }
+        stage ('Selenium Widget Gallery, Chrome') {
+            steps {
+                dir ('examples/widgetgallery') {
+                    script {
+                        withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+                            // Start widget gallery, in a disowned process, so that it keeps on running as a background job.
+                            // For convenience the log is placed on the selenium directory.
+                            sh "../../build-mt-http/examples/widgetgallery/widgetgallery.wt --docroot=docroot --approot=approot --http-address 0.0.0.0 --http-port 9090 --resources-dir=../../resources > ../../selenium/wgoutput-chrome.log 2>&1 &"
+                        }
+                    }
+                }
+                dir ('selenium') {
+                    warnError('Selenium Chrome failed') {
+                        sh "python3 testWidgetGallery.py chrome http://localhost:9090"
+                    }
+                    sh "ps aux | grep [w]idgetgallery | awk '{ print \$2; }' | xargs kill"
+                }
+            }
+        }
+        stage ('Selenium Widget Gallery, Firefox') {
+            steps {
+                dir ('examples/widgetgallery') {
+                    script {
+                        withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
+                            // Start widget gallery, in a disowned process, so that it keeps on running as a background job.
+                            // For convenience the log is placed on the selenium directory.
+                            sh "../../build-mt-http/examples/widgetgallery/widgetgallery.wt --docroot=docroot --approot=approot --http-address 0.0.0.0 --http-port 9090 --resources-dir=../../resources > ../../selenium/wgoutput-firefox.log 2>&1 &"
+                        }
+                    }
+                }
+                dir ('selenium') {
+                    warnError('Selenium Firefox failed') {
+                        sh "python3 testWidgetGallery.py firefox http://localhost:9090 \$(which geckodriver)"
+                    }
+                    sh "ps aux | grep [w]idgetgallery | awk '{ print \$2; }' | xargs kill"
+                }
+            }
+        }
     }
     post {
         always {
+            archiveArtifacts artifacts: 'selenium/*.log', fingerprint: true
             junit '*_test_log.xml'
         }
         cleanup {
