@@ -21,8 +21,10 @@
 #include "SocketNotifier.h"
 
 #if defined(WT_THREADED) && !defined(WT_TARGET_JAVA)
+#include <atomic>
 #include <thread>
 #include <mutex>
+#include <shared_mutex>
 #endif
 
 namespace http {
@@ -133,7 +135,7 @@ public:
 #endif // WT_CNOR
 
   std::vector<std::string> sessions(bool onlyRendered = false);
-  bool expireSessions();
+  void expireSessions(bool force);
   void start();
   void shutdown();
 
@@ -158,13 +160,28 @@ private:
   Configuration& conf_;
   std::string singleSessionId_;
   bool autoExpire_;
-  int plainHtmlSessions_, ajaxSessions_;
+#ifndef WT_THREADED
+  int plainHtmlSessions_;
+  int ajaxSessions_;
   volatile int zombieSessions_;
+#else
+  std::atomic<int> plainHtmlSessions_;
+  std::atomic<int> ajaxSessions_;
+  std::atomic<int> zombieSessions_;
+#endif // WT_THREADED
   std::string redirectSecret_;
   std::atomic_bool running_;
 
 #ifdef WT_THREADED
-  std::mutex uploadProgressUrlsMutex_;
+#ifndef WT_CXX17
+  using mutex_t = std::shared_timed_mutex;
+#else
+  using mutex_t = std::shared_mutex;
+#endif // WT_CXX17
+#endif // WT_THREADED
+
+#ifdef WT_THREADED
+  mutex_t uploadProgressUrlsMutex_;
 #endif // WT_THREADED
   std::set<std::string> uploadProgressUrls_;
 
@@ -172,22 +189,24 @@ private:
   SessionMap sessions_;
 
 #ifdef WT_THREADED
-  // mutex to protect access to the sessions map and plain/ajax session
-  // counts
-  mutable std::recursive_mutex mutex_;
+  // mutex to protect access to the sessions map
+  mutable mutex_t mutex_;
+  
+  // atomic flag to limit excessive session expiring
+  std::atomic_flag expiring_;
 
   SocketNotifier socketNotifier_;
   // mutex to protect access to notifier maps. This cannot be protected
   // by mutex_ as this lock is grabbed while the application lock is
   // being held, which would potentially deadlock if we took mutex_.
-  std::recursive_mutex notifierMutex_;
+  mutex_t notifierMutex_;
   SocketNotifierMap socketNotifiersRead_;
   SocketNotifierMap socketNotifiersWrite_;
   SocketNotifierMap socketNotifiersExcept_;
   // assumes that you did grab the notifierMutex_
   SocketNotifierMap& socketNotifiers(WSocketNotifier::Type type);
   void socketNotify(int descriptor, WSocketNotifier::Type type);
-#endif
+#endif // WT_THREADED
 
   struct UpdateResourceProgressParams {
       std::string requestParam;
