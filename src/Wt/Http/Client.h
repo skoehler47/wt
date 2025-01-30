@@ -14,38 +14,15 @@
 #include <Wt/Http/Message.h>
 #include <Wt/Http/Method.h>
 
+#ifndef WT_TARGET_JAVA
+#include <Wt/AsioWrapper/io_service.hpp>
+#endif
 #include <Wt/AsioWrapper/namespace.hpp>
 #include <Wt/AsioWrapper/system_error.hpp>
 
 #include <chrono>
 #include <string>
 #include <mutex>
-
-#ifndef WT_TARGET_JAVA
-#ifdef WT_ASIO_IS_BOOST_ASIO
-#include <boost/version.hpp>
-namespace boost {
-  namespace asio {
-#if BOOST_VERSION >= 106600
-    class io_context;
-    typedef io_context io_service;
-#else
-    class io_service;
-#endif
-  }
-}
-#else // WT_ASIO_IS_STANDALONE_ASIO
-#include <asio/version.hpp>
-namespace asio {
-#if ASIO_VERSION >= 101200
-  class io_context;
-  typedef io_context io_service;
-#else
-  class io_service;
-#endif
-}
-#endif // WT_ASIO_IS_BOOST_ASIO
-#endif // WT_TARGET_JAVA
 
 namespace Wt {
 

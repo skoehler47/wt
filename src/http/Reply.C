@@ -471,9 +471,11 @@ void Reply::setConnection(ConnectionPtr connection)
 
 void Reply::receive()
 {
-  connection_->strand().post
-    (std::bind(&Connection::readMore, connection_,
-               shared_from_this(), 120));
+  asio::post(connection_->strand(),
+             std::bind(&Connection::readMore,
+                       connection_,
+                       shared_from_this(),
+                       120));
 }
 
 void Reply::send()
@@ -484,10 +486,11 @@ void Reply::send()
     LOG_DEBUG("Reply: send(): scheduling write response.");
 
     // We post this since we want to avoid growing the stack indefinitely
-    connection_->server()->service().post
-      (connection_->strand().wrap
-       (std::bind(&Connection::startWriteResponse, connection_,
-                  shared_from_this())));
+    asio::post(connection_->server()->service(),
+               connection_->strand().wrap(
+                  std::bind(&Connection::startWriteResponse,
+                            connection_,
+                            shared_from_this())));
   }
 }
 
@@ -571,7 +574,7 @@ bool Reply::encodeNextContentBuffer(
 
       gzipStrm_.avail_in = bs;
       gzipStrm_.next_in = const_cast<unsigned char*>(
-            asio::buffer_cast<const unsigned char*>(b));
+        static_cast<const unsigned char*>(b.data()));
 
       unsigned char out[16*1024];
       do {
