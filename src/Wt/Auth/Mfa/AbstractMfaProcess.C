@@ -95,7 +95,7 @@ User AbstractMfaProcess::processMfaToken()
 
     if (token) {
       LOG_INFO("processMfaToken: Processing auth token for MFA for user: " << login().user().id());
-      AuthTokenResult result = baseAuth().processAuthToken(*token, users());
+      AuthTokenResult result = baseAuth().processAuthToken(*token, users(), AuthTokenType::MFA);
 
       switch(result.state()) {
         case AuthTokenState::Valid: {
@@ -151,7 +151,8 @@ void AbstractMfaProcess::setRememberMeCookie(User user)
   int duration = baseAuth().mfaTokenValidity() * 60;
 
   LOG_INFO("Setting auth token for MFA named: " << baseAuth().mfaTokenCookieName() << " with validity (in seconds): " << duration);
-  auto cookie = Http::Cookie(baseAuth().mfaTokenCookieName(), baseAuth().createAuthToken(user));
+  auto cookie = Http::Cookie(baseAuth().mfaTokenCookieName(),
+                             baseAuth().createAuthToken(user, AuthTokenType::MFA));
 #ifndef WT_TARGET_JAVA
   cookie.setMaxAge(std::chrono::seconds(duration));
 #else
