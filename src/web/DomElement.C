@@ -995,8 +995,6 @@ void DomElement::asHTML(EscapeOStream& out,
 
   const bool supportButton = true;
 
-  bool needAnchorWrap = false;
-
   if (!supportButton && type_ == DomElementType::BUTTON) {
     renderedType = DomElementType::INPUT;
 
@@ -1079,10 +1077,6 @@ void DomElement::asHTML(EscapeOStream& out,
       else
         out << "\"\"";
     }
-  } else if (needAnchorWrap) {
-    out << "<a href=\"#\" class=\"Wt-wrap\" onclick=";
-    fastHtmlAttributeValue(out, attributeValues, clickEvent->second.jsCode);
-    out << "><" << elementNames_[static_cast<unsigned int>(renderedType)];
   } else if (renderedType == DomElementType::OTHER)  // Custom tag name
         out << '<' << elementTagName_;
   else
@@ -1112,8 +1106,21 @@ void DomElement::asHTML(EscapeOStream& out,
                 static_cast<unsigned int>(UserAgent::IE9)))
           setJavaScriptEvent(javaScript, i->first, i->second, app);
         else {
-          out << " on" << const_cast<char *>(i->first) << '=';
-          fastHtmlAttributeValue(out, attributeValues, i->second.jsCode);
+          // All event handlers ought to be JS, not DOM: #13501
+          std::string elementId = id();
+          if (elementId.empty()) {
+            WObject dummy;
+            elementId = dummy.id();
+            out << " id=";
+            fastHtmlAttributeValue(out, attributeValues, elementId);
+          }
+          auto eventName = const_cast<char *>(i->first);
+          WStringStream eventJS;
+          eventJS << WT_CLASS << ".$('" << elementId << "').on" << eventName << " = "
+                  << "function() {"
+                  <<   i->second.jsCode << ";"
+                  << "};";
+          app->doJavaScript(eventJS.str());
         }
       }
     }
@@ -1250,20 +1257,23 @@ void DomElement::asHTML(EscapeOStream& out,
           && app->environment().agent() == UserAgent::IE6
           && innerHTML.empty()
           && childrenToAdd_.empty()
-          && childrenHtml_.empty())
+          && childrenHtml_.empty()) {
         out << "&nbsp;";
-          if (renderedType  == DomElementType::OTHER) // Custom tag name
-            out << "</" << elementTagName_ << ">";
-          else
-            out << "</" << elementNames_[static_cast<unsigned int>(renderedType)]
-                << ">";
-    } else
-      out << " />";
+      }
 
-    if (needButtonWrap && supportButton)
+      if (renderedType  == DomElementType::OTHER) {// Custom tag name
+        out << "</" << elementTagName_ << ">";
+      } else {
+        out << "</" << elementNames_[static_cast<unsigned int>(renderedType)]
+            << ">";
+      }
+    } else {
+      out << " />";
+    }
+
+    if (needButtonWrap && supportButton) {
       out << "</button>";
-    else if (needAnchorWrap)
-      out << "</a>";
+    }
   }
 
   javaScript << javaScriptEvenWhenDeleted_ << javaScript_;

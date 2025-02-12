@@ -172,8 +172,9 @@ public:
         ""  "window.close();"
         "}\n"
         "}\n"
+        "window.onload = function() { load(); };\n"
         "</script></head>"
-        "<body onload=\"load();\"></body></html>";
+        "<body></body></html>";
     }
   }
 

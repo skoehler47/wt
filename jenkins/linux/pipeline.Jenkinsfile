@@ -326,7 +326,8 @@ pipeline {
                                 // Find whether a branch exists that starts with a ticket number,
                                 // being the same as the current branch's ticket number.
                                 // `it` being the implicit element
-                                def foundBranch = branches.find { it.trim().split('/')[0].trim() == currentTicketNumber };
+                                // Branch format: origin/{ticket}/{description}
+                                def foundBranch = branches.find { it.trim().split('/')[1].trim() == currentTicketNumber };
                                 if (foundBranch != null) {
                                     sh "git checkout ${foundBranch}"
                                 }
@@ -478,7 +479,7 @@ EOF"""
             post {
                 success {
                     updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'success'
-                    archiveArtifacts artifacts: 'wt-port/java/dist/*.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'wt-port/java/dist/*.jar,wt-port/java/*.pom', fingerprint: true
                 }
                 aborted {
                     updateGitlabCommitStatus name: 'Overarching Pipeline', state: 'canceled'

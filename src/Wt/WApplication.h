@@ -23,6 +23,7 @@ namespace boost {
 
 #include <Wt/WObject.h>
 #include <Wt/WCssStyleSheet.h>
+#include <Wt/WEnvironment.h>
 #include <Wt/WEvent.h>
 #include <Wt/WJavaScriptPreamble.h>
 #include <Wt/WJavaScriptSlot.h>
@@ -59,6 +60,7 @@ class WebSession;
 class RootContainer;
 class UpdateLockImpl;
 class SoundManager;
+class ServerSideFontMetrics;
 
   namespace Http {
     class Cookie;
@@ -2128,6 +2130,16 @@ public:
    */
   Signal<>& unsuspended() { return unsuspended_; }
 
+  /*! \brief Returns the font metrics for server-side rendering
+   *
+   * In case we require the fallback to render things server-side, this
+   * will require the construction of font metrics. The application will
+   * construct this object only once, as an optimization.
+   *
+   * In case the object did not yet exist, a new instance is created.
+   */
+  ServerSideFontMetrics *serverSideFontMetrics();
+
 protected:
   /*! \brief Notifies an event to the application.
    *
@@ -2443,6 +2455,13 @@ private:
   JSignal<> unloaded_;
   JSignal<> idleTimeout_;
 
+  // Track cookies added over application lifetime.
+  // WEnvironment does not update itself, so `setCookie` is not reflected by it.
+  WEnvironment::CookieMap addedCookies_;
+  const std::string* findAddedCookies(const std::string& name) const;
+  // Remove the added cookie, for correct bookkeeping.
+  void removeAddedCookies(const std::string& name);
+
   WContainerWidget *timerRoot() const { return timerRoot_; }
   WEnvironment& env(); // short-hand for session_->env()
 
@@ -2520,6 +2539,10 @@ private:
   SoundManager *getSoundManager();
   SoundManager *soundManager_;
 
+  // Server-side font metrics, constructed once (on demand),
+  // and reused by all painters that require it.
+  std::unique_ptr<ServerSideFontMetrics> serverSideFontMetrics_;
+
   static const char *RESOURCES_URL;
 
 #ifdef WT_TARGET_JAVA
@@ -2527,6 +2550,7 @@ private:
   JSlot hideLoadJS;
 #endif
 
+  friend class Auth::AuthModel;
   friend class WCssStyleSheet;
   friend class WebRenderer;
   friend class WebSession;

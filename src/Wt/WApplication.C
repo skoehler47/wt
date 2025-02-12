@@ -29,6 +29,7 @@
 #include "SoundManager.h"
 #include "WebController.h"
 #include "WebUtils.h"
+#include "ServerSideFontMetrics.h"
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/pool/pool.hpp>
@@ -134,7 +135,8 @@ WApplication::WApplication(const WEnvironment& env
     hideLoadingIndicator_("hideload", this),
     unloaded_(this, "Wt-unload"),
     idleTimeout_(this, "Wt-idleTimeout"),
-    soundManager_(nullptr)
+    soundManager_(nullptr),
+    serverSideFontMetrics_(nullptr)
 {
   session_->setApplication(this);
   locale_ = environment().locale();
@@ -428,6 +430,14 @@ WApplication::~WApplication()
 WWebWidget *WApplication::domRoot() const
 {
   return domRoot_.get();
+}
+
+ServerSideFontMetrics *WApplication::serverSideFontMetrics()
+{
+  if (!serverSideFontMetrics_)
+    serverSideFontMetrics_.reset(new ServerSideFontMetrics());
+
+  return serverSideFontMetrics_.get();
 }
 
 void WApplication::attachThread(bool attach)
@@ -1217,6 +1227,8 @@ void WApplication::setCookie(const std::string& name,
   cookie.setSecure(secure);
 
   session_->renderer().setCookie(cookie);
+
+  addedCookies_[name] = value;
 }
 
 #ifndef WT_TARGET_JAVA
@@ -1250,6 +1262,9 @@ void WApplication::setCookie(const Http::Cookie& cookie)
 void WApplication::removeCookie(const Http::Cookie& cookie)
 {
   session_->renderer().removeCookie(cookie);
+
+  // Stop tracking this previously added cookie.
+  removeAddedCookies(cookie.name());
 }
 
 void WApplication::removeCookie(const std::string& name,
@@ -1261,6 +1276,9 @@ void WApplication::removeCookie(const std::string& name,
   rmCookie.setPath(path);
 
   session_->renderer().removeCookie(rmCookie);
+
+  // Stop tracking this previously added cookie.
+  removeAddedCookies(name);
 }
 
 void WApplication::addMetaLink(const std::string &href,
@@ -1872,5 +1890,20 @@ void WApplication::resumeRendering()
   session_->resumeRendering();
 }
 #endif // WT_TARGET_JAVA
+
+const std::string* WApplication::findAddedCookies(const std::string& name) const
+{
+  WEnvironment::CookieMap::const_iterator i = addedCookies_.find(name);
+
+  if (i == addedCookies_.end())
+    return nullptr;
+  else
+    return &i->second;
+}
+
+void WApplication::removeAddedCookies(const std::string& name)
+{
+  addedCookies_.erase(name);
+}
 
 }
