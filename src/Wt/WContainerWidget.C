@@ -196,9 +196,11 @@ std::unique_ptr<WWidget> WContainerWidget::removeWidget(WWidget *widget)
 void WContainerWidget::clear()
 {
 #ifndef WT_NO_LAYOUT
-  layout_.reset();
-  flags_.set(BIT_LAYOUT_NEEDS_RERENDER);
-  repaint();
+  if (layout_) {
+    layout_.reset();
+    flags_.set(BIT_LAYOUT_NEEDS_RERENDER);
+    repaint();
+  }
 #endif
 
   while (!children_.empty())
