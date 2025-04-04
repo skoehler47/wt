@@ -1496,8 +1496,6 @@ void WebRenderer::serveMainpage(WebResponse& response)
   }
   app->scriptLibrariesAdded_ = 0;
 
-  app->newBeforeLoadJavaScript_ = app->beforeLoadJavaScript_.length();
-
   bool hybridPage = session_.progressiveBoot() || session_.env().ajax();
   FileServe page(hybridPage ? skeletons::Hybrid_html : skeletons::Plain_html);
 
