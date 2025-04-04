@@ -1281,12 +1281,12 @@ void WApplication::removeCookie(const std::string& name,
   removeAddedCookies(name);
 }
 
-void WApplication::addMetaLink(const std::string &href,
-                               const std::string &rel,
-                               const std::string &media,
-                               const std::string &hreflang,
-                               const std::string &type,
-                               const std::string &sizes,
+void WApplication::addMetaLink(const std::string& href,
+                               const std::string& rel,
+                               const std::string& media,
+                               const std::string& hreflang,
+                               const std::string& type,
+                               const std::string& sizes,
                                bool disabled)
 {
   if (environment().javaScript())
@@ -1297,12 +1297,10 @@ void WApplication::addMetaLink(const std::string &href,
   if (rel.empty())
     throw WException("WApplication::addMetaLink() rel cannot be empty!");
 
-  for (unsigned i = 0; i < metaLinks_.size(); ++i) {
+  for (std::size_t i = 0; i < metaLinks_.size(); ++i) {
     MetaLink& ml = metaLinks_[i];
-    if (ml.href == href) {
-      ml.rel = rel;
+    if (ml.href == href && ml.rel == rel && ml.hreflang == hreflang) {
       ml.media = media;
-      ml.hreflang = hreflang;
       ml.type = type;
       ml.sizes = sizes;
       ml.disabled = disabled;
@@ -1310,19 +1308,45 @@ void WApplication::addMetaLink(const std::string &href,
     }
   }
 
-  MetaLink ml(href, rel, media, hreflang, type, sizes, disabled);
-  metaLinks_.push_back(ml);
+  metaLinks_.emplace_back(href, rel, media, hreflang, type, sizes, disabled);
 }
 
-void WApplication::removeMetaLink(const std::string &href)
+void WApplication::removeMetaLink(const std::string& href)
 {
-  for (unsigned i = 0; i < metaLinks_.size(); ++i) {
-    MetaLink& ml = metaLinks_[i];
-    if (ml.href == href) {
-      metaLinks_.erase(metaLinks_.begin() + i);
-      return;
-    }
-  }
+  auto cond = [&](const MetaLink& ml) {
+    return ml.href == href;
+  };
+  metaLinks_.erase(
+    std::remove_if(std::begin(metaLinks_), std::end(metaLinks_), cond),
+    std::end(metaLinks_));
+}
+
+void WApplication::removeMetaLink(const std::string& href,
+                                  const std::string& rel)
+{
+  auto cond = [&](const MetaLink& ml) {
+    return (ml.href == href || href.empty())
+      && (ml.rel == rel || rel.empty())
+      && !(href.empty() && rel.empty());
+  };
+  metaLinks_.erase(
+    std::remove_if(std::begin(metaLinks_), std::end(metaLinks_), cond),
+    std::end(metaLinks_));
+}
+
+void WApplication::removeMetaLink(const std::string& href,
+                                  const std::string& rel,
+                                  const std::string& hreflang)
+{
+  auto cond = [&](const MetaLink& ml) {
+    return (ml.href == href || href.empty())
+      && (ml.rel == rel || rel.empty())
+      && (ml.hreflang == hreflang || hreflang.empty())
+      && !(href.empty() && rel.empty());
+  };
+  metaLinks_.erase(
+    std::remove_if(std::begin(metaLinks_), std::end(metaLinks_), cond),
+    std::end(metaLinks_));
 }
 
 void WApplication::addMetaHeader(const std::string& name,

@@ -1779,19 +1779,34 @@ public:
    *
    * \sa removeMetaLink()
    */
-  void addMetaLink(const std::string &href,
-                   const std::string &rel,
-                   const std::string &media,
-                   const std::string &hreflang,
-                   const std::string &type,
-                   const std::string &sizes,
+  void addMetaLink(const std::string& href,
+                   const std::string& rel,
+                   const std::string& media,
+                   const std::string& hreflang,
+                   const std::string& type,
+                   const std::string& sizes,
                    bool disabled);
 
   /*! \brief Removes the HTML meta link.
    *
    * \sa addMetaLink()
    */
-  void removeMetaLink(const std::string &href);
+  void removeMetaLink(const std::string& href);
+
+  /*! \brief Removes the HTML meta link.
+   *
+   * \sa addMetaLink()
+   */
+  void removeMetaLink(const std::string& href,
+                      const std::string& rel);
+
+  /*! \brief Removes the HTML meta link.
+   *
+   * \sa addMetaLink()
+   */
+  void removeMetaLink(const std::string& href,
+                      const std::string& rel,
+                      const std::string& hreflang);
 
   /*! \brief Adds a "name" HTML meta header.
    *
