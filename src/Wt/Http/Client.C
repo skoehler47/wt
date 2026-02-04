@@ -129,14 +129,14 @@ public:
     int parsePos;
   };
 
-  Impl(Client *client,
+  Impl(const std::shared_ptr<Core>& core,
        const std::shared_ptr<WebSession>& session,
        asio::io_service& ioService)
     : ioService_(ioService),
       strand_(ioService),
       resolver_(ioService_),
       method_(Http::Method::Get),
-      client_(client),
+      core_(core),
       session_(session),
       timer_(ioService_),
       timeout_(0),
@@ -151,9 +151,9 @@ public:
   void removeClient()
   {
 #ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
+    std::lock_guard<std::mutex> lock(coreMutex_);
 #endif // WT_THREADED
-    client_ = nullptr;
+    core_.reset();
   }
 
   void setTimeout(std::chrono::steady_clock::duration timeout) {
@@ -741,35 +741,35 @@ private:
   void emitDone()
   {
 #ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
+    std::lock_guard<std::mutex> lock(coreMutex_);
 #endif // WT_THREADED
-    if (client_) {
-      if (client_->followRedirect()) {
-        client_->handleRedirect(method_,
+    if (core_) {
+      if (core_->followRedirect()) {
+        core_->handleRedirect(method_,
                                 err_,
                                 response_,
                                 request_);
       } else {
-        client_->emitDone(err_, response_);
+        core_->emitDone(err_, response_);
       }
     }
   }
 
   void emitHeadersReceived() {
 #ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
+    std::lock_guard<std::mutex> lock(coreMutex_);
 #endif // WT_THREADED
-    if (client_) {
-      client_->emitHeadersReceived(response_);
+    if (core_) {
+      core_->emitHeadersReceived(response_);
     }
   }
 
   void emitBodyReceived(const std::string& text) {
 #ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
+    std::lock_guard<std::mutex> lock(coreMutex_);
 #endif // WT_THREADED
-    if (client_) {
-      client_->emitBodyReceived(text);
+    if (core_) {
+      core_->emitBodyReceived(text);
     }
   }
 
@@ -784,9 +784,9 @@ protected:
 
 private:
 #ifdef WT_THREADED
-  std::mutex clientMutex_;
+  std::mutex coreMutex_;
 #endif // WT_THREADED
-  Client *client_;
+  std::shared_ptr<Core> core_;
   std::weak_ptr<WebSession> session_;
   asio::steady_timer timer_;
   std::chrono::steady_clock::duration timeout_;
@@ -803,10 +803,10 @@ private:
 class Client::TcpImpl final : public Client::Impl
 {
 public:
-  TcpImpl(Client *client,
+  TcpImpl(const std::shared_ptr<Core>& core,
           const std::shared_ptr<WebSession>& session,
           asio::io_service& ioService)
-    : Impl(client, session, ioService),
+    : Impl(core, session, ioService),
       socket_(ioService_)
   { }
 
@@ -853,13 +853,13 @@ private:
 class Client::SslImpl final : public Client::Impl
 {
 public:
-  SslImpl(Client *client,
+  SslImpl(const std::shared_ptr<Core>& core,
           const std::shared_ptr<WebSession>& session,
           asio::io_service& ioService,
           bool verifyEnabled,
           asio::ssl::context& context,
           const std::string& hostName)
-    : Impl(client, session, ioService),
+    : Impl(core, session, ioService),
       socket_(ioService_, context),
       verifyEnabled_(verifyEnabled),
       hostName_(hostName)
@@ -1092,7 +1092,9 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
     return false;
 
   if (parsedUrl.protocol == "http") {
-    impl = std::make_shared<TcpImpl>(this, session ? session->shared_from_this() : nullptr, *ioService);
+    impl = std::make_shared<TcpImpl>(shared_from_this(),
+                                     session ? session->shared_from_this() : nullptr,
+                                     *ioService);
     impl_ = impl;
 
 #ifdef WT_WITH_SSL
@@ -1106,7 +1108,7 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
         context.add_verify_path(verifyPath_);
     }
 
-    impl = std::make_shared<SslImpl>(this,
+    impl = std::make_shared<SslImpl>(shared_from_this(),
                                     session ? session->shared_from_this() : nullptr,
                                     *ioService,
                                     verifyEnabled_,
