@@ -1182,11 +1182,16 @@ void Client::Core::handleRedirect(Http::Method method, Wt::AsioWrapper::error_co
 void Client::Core::emitDone(Wt::AsioWrapper::error_code err, const Message& response)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implMutex_);
+  {
+    std::unique_lock<std::recursive_mutex> lock(implMutex_);
 #endif
   
-  impl_.reset();
-  redirectCount_ = 0;
+    impl_.reset();
+    redirectCount_ = 0;
+
+#ifdef WT_THREADED
+  }
+#endif
 
   // abort if client has already been destructed
   if (clientDestructed_) { return; }
