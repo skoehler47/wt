@@ -107,7 +107,7 @@ private:
   Wt::AsioWrapper::asio::io_service *ioService_;
   std::weak_ptr<Impl> impl_;
 #ifdef WT_THREADED
-  std::recursive_mutex implementationMutex_;
+  std::recursive_mutex implMutex_;
 #endif
   std::chrono::steady_clock::duration timeout_;
   std::size_t maximumResponseSize_;
@@ -1024,8 +1024,11 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
 
   WApplication *app = WApplication::instance();
 
-  auto impl = impl_.lock();
-  if (impl) {
+#ifdef WT_THREADED
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
+#endif
+
+  if (impl_.lock()) {
     LOG_ERROR("another request is in progress");
     return false;
   }
@@ -1054,11 +1057,11 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
   if (!parseUrl(url, parsedUrl))
     return false;
 
+  std::shared_ptr<Impl> impl;
   if (parsedUrl.protocol == "http") {
     impl = std::make_shared<TcpImpl>(shared_from_this(),
                                      session ? session->shared_from_this() : nullptr,
                                      *ioService);
-    impl_ = impl;
 
 #ifdef WT_WITH_SSL
   } else if (parsedUrl.protocol == "https") {
@@ -1077,7 +1080,6 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
                                      verifyEnabled_,
                                      context,
                                      parsedUrl.host);
-    impl_ = impl;
 #endif // WT_WITH_SSL
 
   } else {
@@ -1085,6 +1087,7 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
     return false;
   }
 
+  impl_ = impl;
   impl->setTimeout(timeout_);
   impl->setMaximumResponseSize(maximumResponseSize_);
 
@@ -1102,11 +1105,10 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
 void Client::Core::abort()
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
 #endif
 
-  std::shared_ptr<Impl> impl = impl_.lock();
-  if (impl) {
+  if (auto impl = impl_.lock()) {
     impl->asyncStop();
   }
 }
@@ -1153,9 +1155,10 @@ void Client::Core::handleRedirect(Http::Method method, Wt::AsioWrapper::error_co
   if (clientDestructed_) { return; }
 
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
 #endif
   impl_.reset();
+  
   int status = response.status();
   if (!err && (((status == STATUS_MOVED_PERMANENTLY ||
                 status == STATUS_FOUND ||
@@ -1179,7 +1182,7 @@ void Client::Core::handleRedirect(Http::Method method, Wt::AsioWrapper::error_co
 void Client::Core::emitDone(Wt::AsioWrapper::error_code err, const Message& response)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
 #endif
   
   impl_.reset();
