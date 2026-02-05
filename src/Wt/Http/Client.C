@@ -19,6 +19,7 @@
 #include "web/WebSession.h"
 #include "web/WebUtils.h"
 
+#include <atomic>
 #include <memory>
 #include <sstream>
 #include <boost/algorithm/string.hpp>
@@ -64,7 +65,7 @@ public:
   Core(Wt::AsioWrapper::asio::io_service& ioService);
   ~Core();
 
-  void removeClient();
+  void notifyClientDestructed();
 
   void setTimeout(std::chrono::steady_clock::duration timeout);
   std::chrono::steady_clock::duration timeout() const;
@@ -118,6 +119,7 @@ private:
   bool followRedirect_;
   int redirectCount_;
   int maxRedirects_;
+  std::atomic<bool> clientDestructed_;
 };
 
 class Client::Impl : public std::enable_shared_from_this<Client::Impl>
@@ -147,14 +149,6 @@ public:
   { }
 
   virtual ~Impl() { }
-
-  void removeClient()
-  {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(coreMutex_);
-#endif // WT_THREADED
-    core_.reset();
-  }
 
   void setTimeout(std::chrono::steady_clock::duration timeout) {
     timeout_ = timeout;
@@ -760,37 +754,22 @@ private:
 
   void emitDone()
   {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(coreMutex_);
-#endif // WT_THREADED
-    if (core_) {
-      if (core_->followRedirect()) {
-        core_->handleRedirect(method_,
-                                err_,
-                                response_,
-                                request_);
-      } else {
-        core_->emitDone(err_, response_);
-      }
+    if (core_->followRedirect()) {
+      core_->handleRedirect(method_,
+                              err_,
+                              response_,
+                              request_);
+    } else {
+      core_->emitDone(err_, response_);
     }
   }
 
   void emitHeadersReceived() {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(coreMutex_);
-#endif // WT_THREADED
-    if (core_) {
-      core_->emitHeadersReceived(response_);
-    }
+    core_->emitHeadersReceived(response_);
   }
 
   void emitBodyReceived(const std::string& text) {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(coreMutex_);
-#endif // WT_THREADED
-    if (core_) {
-      core_->emitBodyReceived(text);
-    }
+    core_->emitBodyReceived(text);
   }
 
 protected:
@@ -803,9 +782,6 @@ protected:
   Http::Method method_;
 
 private:
-#ifdef WT_THREADED
-  std::mutex coreMutex_;
-#endif // WT_THREADED
   std::shared_ptr<Core> core_;
   std::weak_ptr<WebSession> session_;
   asio::steady_timer timer_;
@@ -953,7 +929,8 @@ Client::Core::Core()
 #endif
     followRedirect_(false),
     redirectCount_(0),
-    maxRedirects_(20)
+    maxRedirects_(20),
+    clientDestructed_(false)
 { }
 
 Client::Core::Core(Wt::AsioWrapper::asio::io_service& ioService)
@@ -967,30 +944,16 @@ Client::Core::Core(Wt::AsioWrapper::asio::io_service& ioService)
 #endif
     followRedirect_(false),
     redirectCount_(0),
-    maxRedirects_(20)
+    maxRedirects_(20),
+    clientDestructed_(false)
 { }
 
 Client::Core::~Core()
+{ }
+
+void Client::Core::notifyClientDestructed()
 {
-  std::shared_ptr<Impl> impl;
-
-  {
-#ifdef WT_THREADED
-    std::lock_guard<std::recursive_mutex> lock(implementationMutex_);
-#endif // WT_THREADED
-
-    impl = impl_.lock();
-    abort();
-  }
-
-  if (impl) {
-    impl->removeClient();
-  }
-}
-
-void Client::Core::removeClient()
-{
-  // TODO
+  clientDestructed_ = true;
 }
 
 void Client::Core::setTimeout(std::chrono::steady_clock::duration timeout)
@@ -1129,11 +1092,11 @@ bool Client::Core::request(Http::Method method, const std::string& url, const Me
     }
 
     impl = std::make_shared<SslImpl>(shared_from_this(),
-                                    session ? session->shared_from_this() : nullptr,
-                                    *ioService,
-                                    verifyEnabled_,
-                                    context,
-                                    parsedUrl.host);
+                                     session ? session->shared_from_this() : nullptr,
+                                     *ioService,
+                                     verifyEnabled_,
+                                     context,
+                                     parsedUrl.host);
     impl_ = impl;
 #endif // WT_WITH_SSL
 
@@ -1206,6 +1169,9 @@ void Client::Core::setMaxRedirects(int maxRedirects)
 void Client::Core::handleRedirect(Http::Method method, Wt::AsioWrapper::error_code err,
                     const Message& response, const Message& request)
 {
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
 #ifdef WT_THREADED
   std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
 #endif
@@ -1235,14 +1201,21 @@ void Client::Core::emitDone(Wt::AsioWrapper::error_code err, const Message& resp
 #ifdef WT_THREADED
   std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
 #endif
-
+  
   impl_.reset();
   redirectCount_ = 0;
+
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
   done_.emit(err, response);
 }
   
 void Client::Core::emitHeadersReceived(const Message& response)
 {
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
   /*
    * The response cannot be completely copied here, because another
    * thread may be writting its body (see issue #13714).
@@ -1252,6 +1225,9 @@ void Client::Core::emitHeadersReceived(const Message& response)
 
 void Client::Core::emitBodyReceived(const std::string& data)
 {
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
   bodyDataReceived_.emit(data);
 }
 
@@ -1267,8 +1243,8 @@ Client::Client(asio::io_service& ioService)
 
 Client::~Client()
 {
-  abort();
-  core_->removeClient();
+  core_->notifyClientDestructed();
+  core_->abort();
 }
 
 void Client::abort()
