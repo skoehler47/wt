@@ -245,7 +245,7 @@ public:
    *
    * \sa request(), done()
    */
-  bool get(const std::string& url, const std::vector<Message::Header> headers);
+  bool get(const std::string& url, const std::vector<Message::Header>& headers);
 
   /*! \brief Starts a HEAD request.
    *
@@ -279,7 +279,7 @@ public:
    *
    * \sa request(), done()
    */
-  bool head(const std::string &url, const std::vector<Message::Header> headers);
+  bool head(const std::string &url, const std::vector<Message::Header>& headers);
 
   /*! \brief Starts a POST request.
    *
