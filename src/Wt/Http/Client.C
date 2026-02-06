@@ -1286,7 +1286,7 @@ bool Client::get(const std::string& url)
 }
 
 bool Client::get(const std::string& url,
-                 const std::vector<Message::Header> headers)
+                 const std::vector<Message::Header>& headers)
 {
   return core_->get(url, headers);
 }
@@ -1297,7 +1297,7 @@ bool Client::head(const std::string& url)
 }
 
 bool Client::head(const std::string& url,
-                  const std::vector<Message::Header> headers)
+                  const std::vector<Message::Header>& headers)
 {
   return core_->head(url, headers);
 }
