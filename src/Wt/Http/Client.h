@@ -153,7 +153,7 @@ public:
    *
    * \sa setTimeout()
    */
-  std::chrono::steady_clock::duration timeout() const { return timeout_; }
+  std::chrono::steady_clock::duration timeout() const;
 
   /*! \brief Sets a maximum response size.
    *
@@ -175,7 +175,7 @@ public:
    *
    * \sa setMaximumResponseSize()
    */
-  std::size_t maximumResponseSize() const { return maximumResponseSize_; }
+  std::size_t maximumResponseSize() const;
 
   /*! \brief Enables SSL certificate verification.
    *
@@ -196,7 +196,7 @@ public:
    *
    * \sa setSslCertificateVerificationEnabled()
    */
-  bool isSslCertificateVerificationEnabled() const { return verifyEnabled_; }
+  bool isSslCertificateVerificationEnabled() const;
 
   /*! \brief Sets a SSL certificate used for server identity verification.
    *
@@ -245,7 +245,7 @@ public:
    *
    * \sa request(), done()
    */
-  bool get(const std::string& url, const std::vector<Message::Header> headers);
+  bool get(const std::string& url, const std::vector<Message::Header>& headers);
 
   /*! \brief Starts a HEAD request.
    *
@@ -279,7 +279,7 @@ public:
    *
    * \sa request(), done()
    */
-  bool head(const std::string &url, const std::vector<Message::Header> headers);
+  bool head(const std::string &url, const std::vector<Message::Header>& headers);
 
   /*! \brief Starts a POST request.
    *
@@ -395,9 +395,7 @@ public:
    * }
    * \endcode
    */
-  Signal<Wt::AsioWrapper::error_code, Message>& done() {
-    return done_;
-  }
+  Signal<Wt::AsioWrapper::error_code, Message>& done();
 
   /*! \brief %Signal that is emitted when all response headers have been
    *         received.
@@ -408,9 +406,7 @@ public:
    *
    * \sa done(), bodyDataReceived()
    */
-  Signal<Message>& headersReceived() {
-    return headersReceived_;
-  }
+  Signal<Message>& headersReceived();
 
   /*! \brief %Signal that is emitted when more body data was received.
    *
@@ -421,9 +417,7 @@ public:
    * You may want to use this in combination with
    * setMaximumResponseSize(0) to handle very long responses.
    */
-  Signal<std::string>& bodyDataReceived() {
-    return bodyDataReceived_;
-  }
+  Signal<std::string>& bodyDataReceived();
 
   /*! \brief Utility class representing an %URL.
    */
@@ -476,32 +470,13 @@ public:
   void setMaxRedirects(int maxRedirects);
 
 private:
-  Wt::AsioWrapper::asio::io_service *ioService_;
-  class Impl;
-  std::weak_ptr<Impl> impl_;
-#ifdef WT_THREADED
-  std::recursive_mutex implementationMutex_;
-#endif
-  std::chrono::steady_clock::duration timeout_;
-  std::size_t maximumResponseSize_;
-  bool verifyEnabled_;
-  std::string verifyFile_, verifyPath_;
-  Signal<Wt::AsioWrapper::error_code, Message> done_;
-  Signal<Message> headersReceived_;
-  Signal<std::string> bodyDataReceived_;
-  bool followRedirect_;
-  int redirectCount_;
-  int maxRedirects_;
 
+  class Impl;
   class TcpImpl;
   class SslImpl;
+  class Core;
 
-  void handleRedirect(Http::Method method, Wt::AsioWrapper::error_code err,
-                      const Message& response, const Message& request);
-
-  void emitDone(Wt::AsioWrapper::error_code err, const Message& response);
-  void emitHeadersReceived(const Message& response);
-  void emitBodyReceived(const std::string& data);
+  std::shared_ptr<Core> core_;
 };
 
   }
