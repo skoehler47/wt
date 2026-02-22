@@ -909,7 +909,7 @@ std::string WSvgImage::strokeStyle() const
     }
   }
 
-  return result.c_str();
+  return result.str();
 }
 
 std::string WSvgImage::fontStyle() const
