@@ -19,6 +19,7 @@
 #include "web/WebSession.h"
 #include "web/WebUtils.h"
 
+#include <atomic>
 #include <memory>
 #include <sstream>
 #include <boost/algorithm/string.hpp>
@@ -56,6 +57,71 @@ LOGGER("Http.Client");
 
   namespace Http {
 
+class Client::Core : public std::enable_shared_from_this<Client::Core>
+{
+public:
+
+  Core();
+  Core(Wt::AsioWrapper::asio::io_service& ioService);
+  ~Core();
+
+  void notifyClientDestructed();
+
+  void setTimeout(std::chrono::steady_clock::duration timeout);
+  std::chrono::steady_clock::duration timeout() const;
+  void setMaximumResponseSize(std::size_t bytes);
+  std::size_t maximumResponseSize() const;
+  void setSslCertificateVerificationEnabled(bool enabled);
+  bool isSslCertificateVerificationEnabled() const;
+  void setSslVerifyFile(const std::string& verifyFile);
+  void setSslVerifyPath(const std::string& verifyPath);
+
+  bool get(const std::string& url);
+  bool get(const std::string& url, const std::vector<Message::Header>& headers);
+  bool head(const std::string &url);
+  bool head(const std::string &url, const std::vector<Message::Header>& headers);
+  bool post(const std::string& url, const Message& message);
+  bool put(const std::string& url, const Message& message);
+  bool deleteRequest(const std::string& url, const Message& message);
+  bool patch(const std::string& url, const Message& message);
+  bool request(Http::Method method, const std::string& url, const Message& message);
+  void abort();
+
+  Signal<Wt::AsioWrapper::error_code, Message>& done();
+  Signal<Message>& headersReceived();
+  Signal<std::string>& bodyDataReceived();
+  bool followRedirect() const;
+  void setFollowRedirect(bool followRedirect);
+  int maxRedirects() const;
+  void setMaxRedirects(int maxRedirects);
+
+  void handleRedirect(Http::Method method, Wt::AsioWrapper::error_code err,
+                      const Message& response, const Message& request);
+
+  void emitDone(Wt::AsioWrapper::error_code err, const Message& response);
+  void emitHeadersReceived(const Message& response);  
+  void emitBodyReceived(const std::string& data);
+
+private:
+
+  Wt::AsioWrapper::asio::io_service *ioService_;
+  std::weak_ptr<Impl> impl_;
+#ifdef WT_THREADED
+  std::recursive_mutex implMutex_;
+#endif
+  std::chrono::steady_clock::duration timeout_;
+  std::size_t maximumResponseSize_;
+  bool verifyEnabled_;
+  std::string verifyFile_, verifyPath_;
+  Signal<Wt::AsioWrapper::error_code, Message> done_;
+  Signal<Message> headersReceived_;
+  Signal<std::string> bodyDataReceived_;
+  bool followRedirect_;
+  int redirectCount_;
+  int maxRedirects_;
+  std::atomic<bool> clientDestructed_;
+};
+
 class Client::Impl : public std::enable_shared_from_this<Client::Impl>
 {
 public:
@@ -65,14 +131,14 @@ public:
     int parsePos;
   };
 
-  Impl(Client *client,
+  Impl(const std::shared_ptr<Core>& core,
        const std::shared_ptr<WebSession>& session,
        asio::io_service& ioService)
     : ioService_(ioService),
       strand_(ioService),
       resolver_(ioService_),
       method_(Http::Method::Get),
-      client_(client),
+      core_(core),
       session_(session),
       timer_(ioService_),
       timeout_(0),
@@ -83,14 +149,6 @@ public:
   { }
 
   virtual ~Impl() { }
-
-  void removeClient()
-  {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
-#endif // WT_THREADED
-    client_ = nullptr;
-  }
 
   void setTimeout(std::chrono::steady_clock::duration timeout) {
     timeout_ = timeout;
@@ -676,37 +734,22 @@ private:
 
   void emitDone()
   {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
-#endif // WT_THREADED
-    if (client_) {
-      if (client_->followRedirect()) {
-        client_->handleRedirect(method_,
-                                err_,
-                                response_,
-                                request_);
-      } else {
-        client_->emitDone(err_, response_);
-      }
+    if (core_->followRedirect()) {
+      core_->handleRedirect(method_,
+                              err_,
+                              response_,
+                              request_);
+    } else {
+      core_->emitDone(err_, response_);
     }
   }
 
   void emitHeadersReceived() {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
-#endif // WT_THREADED
-    if (client_) {
-      client_->emitHeadersReceived(response_);
-    }
+    core_->emitHeadersReceived(response_);
   }
 
   void emitBodyReceived(const std::string& text) {
-#ifdef WT_THREADED
-    std::lock_guard<std::mutex> lock(clientMutex_);
-#endif // WT_THREADED
-    if (client_) {
-      client_->emitBodyReceived(text);
-    }
+    core_->emitBodyReceived(text);
   }
 
 protected:
@@ -719,10 +762,7 @@ protected:
   Http::Method method_;
 
 private:
-#ifdef WT_THREADED
-  std::mutex clientMutex_;
-#endif // WT_THREADED
-  Client *client_;
+  std::shared_ptr<Core> core_;
   std::weak_ptr<WebSession> session_;
   asio::steady_timer timer_;
   std::chrono::steady_clock::duration timeout_;
@@ -739,10 +779,10 @@ private:
 class Client::TcpImpl final : public Client::Impl
 {
 public:
-  TcpImpl(Client *client,
+  TcpImpl(const std::shared_ptr<Core>& core,
           const std::shared_ptr<WebSession>& session,
           asio::io_service& ioService)
-    : Impl(client, session, ioService),
+    : Impl(core, session, ioService),
       socket_(ioService_)
   { }
 
@@ -789,13 +829,13 @@ private:
 class Client::SslImpl final : public Client::Impl
 {
 public:
-  SslImpl(Client *client,
+  SslImpl(const std::shared_ptr<Core>& core,
           const std::shared_ptr<WebSession>& session,
           asio::io_service& ioService,
           bool verifyEnabled,
           asio::ssl::context& context,
           const std::string& hostName)
-    : Impl(client, session, ioService),
+    : Impl(core, session, ioService),
       socket_(ioService_, context),
       verifyEnabled_(verifyEnabled),
       hostName_(hostName)
@@ -856,8 +896,10 @@ private:
 };
 #endif // WT_WITH_SSL
 
-Client::Client()
-  : ioService_(0),
+
+
+Client::Core::Core()
+  : ioService_(nullptr),
     timeout_(std::chrono::seconds{10}),
     maximumResponseSize_(64*1024),
 #ifdef WT_WITH_SSL
@@ -867,10 +909,11 @@ Client::Client()
 #endif
     followRedirect_(false),
     redirectCount_(0),
-    maxRedirects_(20)
+    maxRedirects_(20),
+    clientDestructed_(false)
 { }
 
-Client::Client(asio::io_service& ioService)
+Client::Core::Core(Wt::AsioWrapper::asio::io_service& ioService)
   : ioService_(&ioService),
     timeout_(std::chrono::seconds{10}),
     maximumResponseSize_(64*1024),
@@ -881,117 +924,111 @@ Client::Client(asio::io_service& ioService)
 #endif
     followRedirect_(false),
     redirectCount_(0),
-    maxRedirects_(20)
+    maxRedirects_(20),
+    clientDestructed_(false)
 { }
 
-Client::~Client()
+Client::Core::~Core()
+{ }
+
+void Client::Core::notifyClientDestructed()
 {
-  std::shared_ptr<Impl> impl;
-
-  {
-#ifdef WT_THREADED
-    std::lock_guard<std::recursive_mutex> lock(implementationMutex_);
-#endif // WT_THREADED
-
-    impl = impl_.lock();
-    abort();
-  }
-
-  if (impl) {
-    impl->removeClient();
-  }
+  clientDestructed_ = true;
 }
 
-void Client::setSslCertificateVerificationEnabled(bool enabled)
-{
-  verifyEnabled_ = enabled;
-}
-
-void Client::abort()
-{
-#ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
-#endif
-
-  std::shared_ptr<Impl> impl = impl_.lock();
-  if (impl) {
-    impl->asyncStop();
-  }
-}
-
-void Client::setTimeout(std::chrono::steady_clock::duration timeout)
+void Client::Core::setTimeout(std::chrono::steady_clock::duration timeout)
 {
   timeout_ = timeout;
 }
 
-void Client::setMaximumResponseSize(std::size_t bytes)
+std::chrono::steady_clock::duration Client::Core::timeout() const
+{
+  return timeout_;
+}
+
+void Client::Core::setMaximumResponseSize(std::size_t bytes)
 {
   maximumResponseSize_ = bytes;
 }
 
-void Client::setSslVerifyFile(const std::string& file)
+std::size_t Client::Core::maximumResponseSize() const
 {
-  verifyFile_ = file;
+  return maximumResponseSize_; 
 }
 
-void Client::setSslVerifyPath(const std::string& path)
+void Client::Core::setSslCertificateVerificationEnabled(bool enabled)
 {
-  verifyPath_ = path;
+    verifyEnabled_ = enabled;
 }
 
-bool Client::get(const std::string& url)
+bool Client::Core::isSslCertificateVerificationEnabled() const
+{
+    return verifyEnabled_;
+}
+
+void Client::Core::setSslVerifyFile(const std::string& verifyFile)
+{
+  verifyFile_ = verifyFile;
+}
+
+void Client::Core::setSslVerifyPath(const std::string& verifyPath)
+{
+  verifyPath_ = verifyPath;
+}
+
+bool Client::Core::get(const std::string& url)
 {
   return request(Http::Method::Get, url, Message());
 }
 
-bool Client::get(const std::string& url,
-                 const std::vector<Message::Header> headers)
+bool Client::Core::get(const std::string& url, const std::vector<Message::Header>& headers)
 {
   Message m(headers);
   return request(Http::Method::Get, url, m);
 }
 
-bool Client::head(const std::string& url)
+bool Client::Core::head(const std::string &url)
 {
   return request(Http::Method::Head, url, Message());
 }
 
-bool Client::head(const std::string& url,
-                  const std::vector<Message::Header> headers)
+bool Client::Core::head(const std::string &url, const std::vector<Message::Header>& headers)
 {
   Message m(headers);
   return request(Http::Method::Head, url, m);
 }
 
-bool Client::post(const std::string& url, const Message& message)
+bool Client::Core::post(const std::string& url, const Message& message)
 {
   return request(Http::Method::Post, url, message);
 }
 
-bool Client::put(const std::string& url, const Message& message)
+bool Client::Core::put(const std::string& url, const Message& message)
 {
   return request(Http::Method::Put, url, message);
 }
 
-bool Client::deleteRequest(const std::string& url, const Message& message)
+bool Client::Core::deleteRequest(const std::string& url, const Message& message)
 {
   return request(Http::Method::Delete, url, message);
 }
 
-bool Client::patch(const std::string& url, const Message& message)
+bool Client::Core::patch(const std::string& url, const Message& message)
 {
   return request(Http::Method::Patch, url, message);
 }
 
-bool Client::request(Http::Method method, const std::string& url,
-                     const Message& message)
+bool Client::Core::request(Http::Method method, const std::string& url, const Message& message)
 {
   asio::io_service *ioService = ioService_;
 
   WApplication *app = WApplication::instance();
 
-  auto impl = impl_.lock();
-  if (impl) {
+#ifdef WT_THREADED
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
+#endif
+
+  if (impl_.lock()) {
     LOG_ERROR("another request is in progress");
     return false;
   }
@@ -1020,9 +1057,11 @@ bool Client::request(Http::Method method, const std::string& url,
   if (!parseUrl(url, parsedUrl))
     return false;
 
+  std::shared_ptr<Impl> impl;
   if (parsedUrl.protocol == "http") {
-    impl = std::make_shared<TcpImpl>(this, session ? session->shared_from_this() : nullptr, *ioService);
-    impl_ = impl;
+    impl = std::make_shared<TcpImpl>(shared_from_this(),
+                                     session ? session->shared_from_this() : nullptr,
+                                     *ioService);
 
 #ifdef WT_WITH_SSL
   } else if (parsedUrl.protocol == "https") {
@@ -1035,13 +1074,12 @@ bool Client::request(Http::Method method, const std::string& url,
         context.add_verify_path(verifyPath_);
     }
 
-    impl = std::make_shared<SslImpl>(this,
+    impl = std::make_shared<SslImpl>(shared_from_this(),
                                      session ? session->shared_from_this() : nullptr,
                                      *ioService,
                                      verifyEnabled_,
                                      context,
                                      parsedUrl.host);
-    impl_ = impl;
 #endif // WT_WITH_SSL
 
   } else {
@@ -1049,6 +1087,7 @@ bool Client::request(Http::Method method, const std::string& url,
     return false;
   }
 
+  impl_ = impl;
   impl->setTimeout(timeout_);
   impl->setMaximumResponseSize(maximumResponseSize_);
 
@@ -1063,39 +1102,68 @@ bool Client::request(Http::Method method, const std::string& url,
   return true;
 }
 
-bool Client::followRedirect() const
+void Client::Core::abort()
+{
+#ifdef WT_THREADED
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
+#endif
+
+  if (auto impl = impl_.lock()) {
+    impl->asyncStop();
+  }
+}
+
+Signal<Wt::AsioWrapper::error_code, Message>& Client::Core::done()
+{
+  return done_;
+}
+
+Signal<Message>& Client::Core::headersReceived()
+{
+  return headersReceived_;
+}
+
+Signal<std::string>& Client::Core::bodyDataReceived()
+{
+  return bodyDataReceived_;
+}
+
+bool Client::Core::followRedirect() const
 {
   return followRedirect_;
 }
 
-void Client::setFollowRedirect(bool followRedirect)
+void Client::Core::setFollowRedirect(bool followRedirect)
 {
   followRedirect_ = followRedirect;
 }
 
-int Client::maxRedirects() const
+int Client::Core::maxRedirects() const
 {
   return maxRedirects_;
 }
 
-void Client::setMaxRedirects(int maxRedirects)
+void Client::Core::setMaxRedirects(int maxRedirects)
 {
   maxRedirects_ = maxRedirects;
 }
 
-void Client::handleRedirect(Http::Method method,
-                            AsioWrapper::error_code err,
-                            const Message& response, const Message& request)
+void Client::Core::handleRedirect(Http::Method method, Wt::AsioWrapper::error_code err,
+                    const Message& response, const Message& request)
 {
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
+  std::unique_lock<std::recursive_mutex> lock(implMutex_);
 #endif
   impl_.reset();
+  
   int status = response.status();
   if (!err && (((status == STATUS_MOVED_PERMANENTLY ||
-                 status == STATUS_FOUND ||
-                 status == STATUS_TEMPORARY_REDIRECT) && method == Http::Method::Get) ||
-               status == STATUS_SEE_OTHER)) {
+                status == STATUS_FOUND ||
+                status == STATUS_TEMPORARY_REDIRECT) && method == Http::Method::Get) ||
+              status == STATUS_SEE_OTHER)) {
     const std::string *newUrl = response.getHeader("Location");
     ++ redirectCount_;
     if (newUrl) {
@@ -1104,26 +1172,38 @@ void Client::handleRedirect(Http::Method method,
         return;
       } else {
         LOG_WARN("Redirect count of " << maxRedirects_
-                 << " exceeded! Redirect URL: " << *newUrl);
+                << " exceeded! Redirect URL: " << *newUrl);
       }
     }
   }
   emitDone(err, response);
 }
 
-void Client::emitDone(AsioWrapper::error_code err, const Message& response)
+void Client::Core::emitDone(Wt::AsioWrapper::error_code err, const Message& response)
 {
 #ifdef WT_THREADED
-  std::unique_lock<std::recursive_mutex> lock(implementationMutex_);
+  {
+    std::unique_lock<std::recursive_mutex> lock(implMutex_);
+#endif
+  
+    impl_.reset();
+    redirectCount_ = 0;
+
+#ifdef WT_THREADED
+  }
 #endif
 
-  impl_.reset();
-  redirectCount_ = 0;
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
   done_.emit(err, response);
 }
-
-void Client::emitHeadersReceived(const Message& response)
+  
+void Client::Core::emitHeadersReceived(const Message& response)
 {
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
   /*
    * The response cannot be completely copied here, because another
    * thread may be writting its body (see issue #13714).
@@ -1131,9 +1211,156 @@ void Client::emitHeadersReceived(const Message& response)
   headersReceived_.emit(Message(response.headers(), response.status()));
 }
 
-void Client::emitBodyReceived(const std::string& data)
+void Client::Core::emitBodyReceived(const std::string& data)
 {
+  // abort if client has already been destructed
+  if (clientDestructed_) { return; }
+
   bodyDataReceived_.emit(data);
+}
+
+
+
+Client::Client()
+  : core_(std::make_shared<Core>())
+{ }
+
+Client::Client(asio::io_service& ioService)
+  : core_(std::make_shared<Core>(ioService))
+{ }
+
+Client::~Client()
+{
+  core_->notifyClientDestructed();
+  core_->abort();
+}
+
+void Client::abort()
+{
+  core_->abort();
+}
+
+void Client::setTimeout(std::chrono::steady_clock::duration timeout)
+{
+  core_->setTimeout(timeout);
+}
+
+std::chrono::steady_clock::duration Client::timeout() const
+{
+  return core_->timeout();
+}
+
+void Client::setMaximumResponseSize(std::size_t bytes)
+{
+  core_->setMaximumResponseSize(bytes);
+}
+
+std::size_t Client::maximumResponseSize() const
+{
+  return core_->maximumResponseSize(); 
+}
+
+void Client::setSslCertificateVerificationEnabled(bool enabled)
+{
+  core_->setSslCertificateVerificationEnabled(enabled);
+}
+
+bool Client::isSslCertificateVerificationEnabled() const
+{
+  return core_->isSslCertificateVerificationEnabled();
+}
+
+void Client::setSslVerifyFile(const std::string& verifyFile)
+{
+  core_->setSslVerifyFile(verifyFile);
+}
+
+void Client::setSslVerifyPath(const std::string& verifyPath)
+{
+  core_->setSslVerifyPath(verifyPath);
+}
+
+bool Client::get(const std::string& url)
+{
+  return core_->get(url);
+}
+
+bool Client::get(const std::string& url,
+                 const std::vector<Message::Header>& headers)
+{
+  return core_->get(url, headers);
+}
+
+bool Client::head(const std::string& url)
+{
+  return core_->head(url);
+}
+
+bool Client::head(const std::string& url,
+                  const std::vector<Message::Header>& headers)
+{
+  return core_->head(url, headers);
+}
+
+bool Client::post(const std::string& url, const Message& message)
+{
+  return core_->post(url, message);
+}
+
+bool Client::put(const std::string& url, const Message& message)
+{
+  return core_->put(url, message);
+}
+
+bool Client::deleteRequest(const std::string& url, const Message& message)
+{
+  return core_->deleteRequest(url, message);
+}
+
+bool Client::patch(const std::string& url, const Message& message)
+{
+  return core_->patch(url, message);
+}
+
+bool Client::request(Http::Method method, const std::string& url,
+                     const Message& message)
+{
+  return core_->request(method, url, message); 
+}
+
+Signal<Wt::AsioWrapper::error_code, Message>& Client::done()
+{
+  return core_->done();
+}
+
+Signal<Message>& Client::headersReceived()
+{
+  return core_->headersReceived();
+}
+
+Signal<std::string>& Client::bodyDataReceived()
+{
+  return core_->bodyDataReceived();
+}
+
+bool Client::followRedirect() const
+{
+  return core_->followRedirect();
+}
+
+void Client::setFollowRedirect(bool followRedirect)
+{
+  core_->setFollowRedirect(followRedirect);
+}
+
+int Client::maxRedirects() const
+{
+  return core_->maxRedirects();
+}
+
+void Client::setMaxRedirects(int maxRedirects)
+{
+  core_->setMaxRedirects(maxRedirects);
 }
 
 bool Client::parseUrl(const std::string &url, URL &parsedUrl)
