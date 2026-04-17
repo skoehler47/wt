@@ -85,8 +85,7 @@ void WFormWidget::setPlaceholderText(const WString& placeholderText)
 
   WApplication* app = WApplication::instance();
   const WEnvironment& env = app->environment();
-  if (!env.agentIsIElt(10) &&
-    (domElementType() == DomElementType::INPUT || domElementType() == DomElementType::TEXTAREA)) {
+  if (!env.agentIsIElt(10)) {
     flags_.set(BIT_PLACEHOLDER_CHANGED);
     repaint();
   } else {
@@ -150,11 +149,16 @@ void WFormWidget::render(WFlags<RenderFlag> flags)
 
 void WFormWidget::updateEmptyText()
 {
-  WApplication *app = WApplication::instance();
-  const WEnvironment &env = app->environment();
-  if (env.agentIsIElt(10) && isRendered())
+  WApplication* app = WApplication::instance();
+  const WEnvironment& env = app->environment();
+  if (env.agentIsIElt(10) && isRendered()) {
     doJavaScript(jsRef() + ".wtObj"
-                 ".setEmptyText(" + emptyText_.jsStringLiteral() + ");");
+      ".setEmptyText(" + emptyText_.jsStringLiteral() + ");");
+  }
+  else {
+    flags_.set(BIT_PLACEHOLDER_CHANGED);
+    repaint();
+  }
 }
 
 void WFormWidget::applyEmptyText()
