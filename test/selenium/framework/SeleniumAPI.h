@@ -15,6 +15,7 @@
 #include <Python.h>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace Selenium {
   /*! \class APIException "test/selenium/framework/SeleniumAPI.h"

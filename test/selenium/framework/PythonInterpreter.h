@@ -12,6 +12,7 @@
 #include <optional>
 #include <Python.h>
 #include <string>
+#include <vector>
 
 #define val(x) #x
 #define GETVAL(x) val(x)
