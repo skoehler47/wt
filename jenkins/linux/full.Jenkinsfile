@@ -20,6 +20,7 @@ node('wt') {
 
 def wt_configure(Map args) {
     sh """cmake .. \
+            -DCMAKE_CXX_STANDARD=17 \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
