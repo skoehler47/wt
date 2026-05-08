@@ -92,7 +92,7 @@ pipeline {
                         sh "../build-mt-http/test/selenium/test.selenium --log_format=JUNIT --log_level=all --log_sink=${env.WORKSPACE}/mt_selenium_chrome_test_log.xml -- --browser-type 'chrome'"
                     }
                     warnError('mt Selenium (Firefox) tests failed') {
-                        sh "../build-mt-http/test/selenium/test.selenium --log_format=JUNIT --log_level=all --log_sink=${env.WORKSPACE}/mt_selenium_firefox_test_log.xml -- --browser-type 'firefox' --browser-driver '\$(which geckodriver)'"
+                        sh "../build-mt-http/test/selenium/test.selenium --log_format=JUNIT --log_level=all --log_sink=${env.WORKSPACE}/mt_selenium_firefox_test_log.xml -- --browser-type 'firefox'"
                     }
                 }
             }
