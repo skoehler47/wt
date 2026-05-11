@@ -12,7 +12,6 @@ from selenium.webdriver.common.by import By
 
 from selenium.webdriver.support.wait import WebDriverWait
 
-from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
 
 # Generally speaking Selenium discourages the use of XPATH: https://www.selenium.dev/documentation/test_practices/encouraged/locators/
