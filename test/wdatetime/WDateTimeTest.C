@@ -26,6 +26,80 @@ BOOST_AUTO_TEST_CASE( WDateTime_test_WDate )
   BOOST_REQUIRE(!wd.isNull());
 }
 
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_negative_year )
+{
+  Wt::WDate wd(-1, 10, 1);
+  BOOST_TEST(wd.year() == -1);
+  BOOST_TEST(wd.month() == 10);
+  BOOST_TEST(wd.day() == 1);
+  BOOST_TEST(wd.toString() == "Fri Oct 1 -1");
+  BOOST_TEST(wd.isValid());
+  BOOST_TEST(!wd.isNull());
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_positive_year_compare )
+{
+  // Different years
+  Wt::WDate y2000(2000, 1, 1);
+  Wt::WDate y2001(2001, 1, 1);
+  BOOST_TEST((y2000 < y2001));
+}
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_positive_month_compare )
+{
+  // Different months, same year
+  Wt::WDate may15(2000, 5, 15);
+  Wt::WDate jun15(2000, 6, 15);
+  BOOST_TEST((may15 < jun15));
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_positive_day_compare )
+{
+  // Different days, same year and month
+  Wt::WDate day10(2000, 5, 10);
+  Wt::WDate day20(2000, 5, 20);
+  BOOST_TEST((day10 < day20));
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_equality_compare )
+{
+  // Equality
+  Wt::WDate same1(2020, 12, 31);
+  Wt::WDate same2(2020, 12, 31);
+  BOOST_TEST((same1 == same2));
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_negative_year_compare )
+{
+  // Negative years comparisons
+  Wt::WDate neg50( -50, 3, 10 );
+  Wt::WDate neg49( -49, 3, 10 );
+  BOOST_TEST((neg50 < neg49));
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_negative_year_month_compare )
+{
+  // Negative years, different months
+  Wt::WDate neg50Mar( -50, 3, 10 );
+  Wt::WDate neg50Apr( -50, 4, 10 );
+  BOOST_TEST((neg50Mar < neg50Apr));
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_negative_year_day_compare )
+{
+  // Negative years, same month, different days
+  Wt::WDate neg50Mar10( -50, 3, 10 );
+  Wt::WDate neg50Mar20( -50, 3, 20 );
+  BOOST_TEST((neg50Mar10 < neg50Mar20));
+}
+
+BOOST_AUTO_TEST_CASE( WDateTime_test_WDate_negative_and_positive_year_compare )
+{
+  // Negative vs positive
+  Wt::WDate neg1(-1, 12, 31);
+  Wt::WDate pos1(1, 1, 1);
+  BOOST_TEST((neg1 < pos1));
+}
+
 BOOST_AUTO_TEST_CASE( WDateTime_test_WDate2 )
 {
   Wt::WDate wd;
