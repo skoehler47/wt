@@ -232,7 +232,18 @@ WLogEntry WebSession::log(const std::string& type) const
   WLogEntry e = controller_->server()->logger().entry(type);
 
 #ifndef WT_TARGET_JAVA
-  e << WLogger::timestamp << WLogger::sep << getpid() << WLogger::sep
+  if (state_ == State::BeingDestroyed) {
+    /*
+     * We cannot use the currentLocale here because the destructor may
+     * be called due to a thread_local handler being destroyed
+     * (see Issue #14667)
+     */
+    e << WLogger::defaultLocaleTimestamp;
+  } else {
+    e << WLogger::timestamp;
+  }
+
+  e << WLogger::sep << getpid() << WLogger::sep
     << '[' << deploymentPath_ << ' ' << sessionId()
     << ']' << WLogger::sep << '[' << type << ']' << WLogger::sep;
 #endif // WT_TARGET_JAVA
@@ -248,7 +259,7 @@ WebSession::~WebSession()
    * app_ uses a weak_ptr to this session for which lock() returns an empty
    * shared pointer.
    */
-  state_ = State::Dead;
+  state_ = State::BeingDestroyed;
 
 #ifndef WT_TARGET_JAVA
   Handler handler(this);
@@ -378,7 +389,7 @@ void WebSession::setState(State state, int timeout)
   //assert(WebSession::Handler::instance()->haveLock());
 #endif // WT_THREADED
 
-  if (state_ != State::Dead) {
+  if (!dead()) {
     state_ = state;
 
     LOG_DEBUG("Setting to expire in " << timeout << "s");
@@ -994,7 +1005,7 @@ void WebSession
    * destroyed ? I'm not sure why this is useful, but cannot see anything
    * wrong about it either ?
    */
-  if (session->state_ == State::Dead)
+  if (session->dead())
     LOG_WARN_S(session, "attaching to dead session?");
 
   if (!session.get()->attachThreadToLockedHandler()) {
@@ -1105,7 +1116,7 @@ WebSession::Handler::~Handler()
     session_->processQueuedEvents(*this);
     if (session_->triggerUpdate_)
       session_->pushUpdates();
-    else if (response_ && session_->state_ != State::Dead)
+    else if (response_ && !session_->dead())
       session()->render(*this);
 
     Utils::erase(session_->handlers_, this);
@@ -1208,7 +1219,7 @@ void WebSession::doRecursiveEventLoop()
   if (handler->response())
     handler->session()->render(*handler);
 
-  if (state_ == State::Dead) {
+  if (dead()) {
     recursiveEventHandler_ = nullptr;
     throw WException("doRecursiveEventLoop(): session was killed");
   }
@@ -1254,7 +1265,7 @@ void WebSession::doRecursiveEventLoop()
     recursiveEvent_.wait();
 #endif
 
-  if (state_ == State::Dead) {
+  if (dead()) {
     recursiveEventHandler_ = nullptr;
     delete newRecursiveEvent_;
     newRecursiveEvent_ = nullptr;
@@ -1790,6 +1801,7 @@ void WebSession::handleRequest(Handler& handler)
 
         break;
       }
+      case State::BeingDestroyed:
       case State::Dead:
         LOG_INFO("request to dead session, ignoring");
         break;
@@ -2743,6 +2755,7 @@ void WebSession::notify(const WEvent& event)
           render(handler);
       }
     }
+  case State::BeingDestroyed:
   case State::Dead:
     break;
   }

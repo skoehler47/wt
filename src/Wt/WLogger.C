@@ -56,7 +56,17 @@ WLogEntry& WLogEntry::operator<< (const WLogger::Sep&)
 #ifndef WT_DBO_LOGGER
 WLogEntry& WLogEntry::operator<< (const WLogger::TimeStamp&)
 {
-  std::string dt = WLocalDateTime::currentServerDateTime()
+  return addTimestamp(false);
+}
+
+WLogEntry& WLogEntry::operator<< (const WLogger::DefaultLocaleTimeStamp&)
+{
+  return addTimestamp(true);
+}
+
+WLogEntry& WLogEntry::addTimestamp(bool useDefaultLocale)
+{
+  std::string dt = WLocalDateTime::currentServerDateTime(useDefaultLocale)
     .toString("yyyy-MMM-dd hh:mm:ss.zzz").toUTF8();
 
   return *this << '[' << dt << ']';
@@ -226,6 +236,7 @@ bool WLogEntry::Impl::quote() const
 
 const WLogger::Sep WLogger::sep = WLogger::Sep();
 const WLogger::TimeStamp WLogger::timestamp = WLogger::TimeStamp();
+const WLogger::DefaultLocaleTimeStamp WLogger::defaultLocaleTimestamp = WLogger::DefaultLocaleTimeStamp();
 
 WLogger::Field::Field(const std::string& name, bool isString)
   : name_(name),

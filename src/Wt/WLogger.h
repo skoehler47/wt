@@ -110,6 +110,18 @@ public:
    */
   static const TimeStamp timestamp;
 
+  /*! \brief Class that indicates a time stamp using default locale.
+   *
+   * \sa defaultLocaleTimestamp
+   */
+  struct DefaultLocaleTimeStamp { };
+
+  /*! \brief Timestamp field constant using default locale.
+   *
+   * \sa WLogEntry::operator<<(const WLogger::DefaultLocaleTimeStamp&)
+   */
+  static const DefaultLocaleTimeStamp defaultLocaleTimestamp;
+
   /*! \brief Class that holds the configuration for a single field.
    *
    * \sa addField()
@@ -264,9 +276,9 @@ public:
    * line, upon a log() taking place. Without this functionality, it is
    * possible that multiple entries can be put on the same line,
    * followed by an empty line.
-   * 
+   *
    * By default, this is enabled.
-   * 
+   *
    * \note For applications running in a dedicated process mode this
    *       may not be sufficient.
    */
@@ -337,6 +349,13 @@ public:
    * Formats a timestamp (date+time) to the current field.
    */
   WLogEntry& operator<< (const WLogger::TimeStamp&);
+
+  /*! \brief Writes a time stamp in the current field.
+   *
+   * Formats a timestamp (date+time) to the current field
+   * using a default WLocale.
+   */
+  WLogEntry& operator<< (const WLogger::DefaultLocaleTimeStamp&);
 #endif // WT_DBO_LOGGER
 
   /*! \brief Writes a string in the current field.
@@ -428,6 +447,9 @@ public:
 private:
 #endif // WT_DBO_LOGGER
 
+#ifndef WT_DBO_LOGGER
+  WLogEntry& addTimestamp(bool useDefaultLocale);
+#endif
   void startField();
 
   friend class WebSession;

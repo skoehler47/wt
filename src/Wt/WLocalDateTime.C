@@ -339,25 +339,26 @@ WLocalDateTime WLocalDateTime::currentTime(std::chrono::minutes offset, const WT
   return WLocalDateTime(std::chrono::system_clock::now(), z, format);
 }
 
-WLocalDateTime WLocalDateTime::currentServerDateTime()
+WLocalDateTime WLocalDateTime::currentServerDateTime(bool useDefaultLocale)
 {
+  WLocale locale = useDefaultLocale ? WLocale() : WLocale::currentLocale();
 #ifndef WT_WIN32
   std::time_t t = std::time(nullptr);
   std::tm tm;
   ::localtime_r(&t, &tm);
   // tm_gmtoff is not part of the POSIX standard, but Linux, Mac OS X and the BSDs provide it
   return currentTime(cpp20::date::floor<std::chrono::minutes>(std::chrono::seconds{tm.tm_gmtoff}),
-                     WLocale::currentLocale().dateTimeFormat());
+                     locale.dateTimeFormat());
 #else
   TIME_ZONE_INFORMATION tzi{};
   DWORD tz_result = ::GetTimeZoneInformation(&tzi);
   if (tz_result == TIME_ZONE_ID_INVALID)
   {
-    return currentTime(std::chrono::minutes{0}, WLocale::currentLocale().dateTimeFormat());
+    return currentTime(std::chrono::minutes{0}, locale.dateTimeFormat());
   }
   bool dst = tz_result == TIME_ZONE_ID_DAYLIGHT;
   return currentTime(std::chrono::minutes{- tzi.Bias - (dst ? tzi.DaylightBias : 0)},
-                     WLocale::currentLocale().dateTimeFormat());
+                     locale.dateTimeFormat());
 #endif
 }
 

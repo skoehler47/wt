@@ -204,8 +204,12 @@ public:
   static WLocalDateTime currentDateTime(const WLocale& locale = WLocale::currentLocale());
 
   /*! \brief Reports the current local server time.
+   *
+   * Reports the current local server time. If useDefaultLocale is
+   * true, the WLocale used will be WLocale() instead of the current
+   * locale.
    */
-  static WLocalDateTime currentServerDateTime();
+  static WLocalDateTime currentServerDateTime(bool useDefaultLocale = false);
 
   /*! \brief Compares two values.
    */

@@ -79,7 +79,8 @@ public:
     ExpectLoad,
     Loaded,
     Suspended,
-    Dead
+    Dead,
+    BeingDestroyed
   };
 
   WebSession(WebController *controller, const std::string& sessionId,
@@ -142,7 +143,7 @@ public:
   Time expireTime() const { return expire_; }
 #endif // WT_TARGET_JAVA
 
-  bool dead() { return state_ == State::Dead; }
+  bool dead() { return state_ == State::Dead || state_ == State::BeingDestroyed; }
   bool suspended() { return state_ == State::Suspended; }
   State state() const { return state_; }
   void kill();
