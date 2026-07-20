@@ -56,6 +56,14 @@ behaviour.
     <a href="https://redmine.emweb.be/issues/14672" target="_blank">Issue #14672</a>:
     fixed web-socket not working when compression was enabled due to all of their messages being fully compressed.
   </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14676" target="_blank">Issue #14676</a>:
+    fixed
+    <a href="classWt_1_1Auth_1_1Mfa_1_1TotpProcess.html" target="_blank">Auth::Mfa::TotpProcess</a> considering a user
+    trying to login while being throttled as a failed attempt, which would increase the throttle time.
+
+    Additionally, fixed the throttle time shown to the user when trying to enter the TOTP code being smaller than it actually is.
+  </li>
 </ul>
 
 <h2>Release 4.14.0 (July 15, 2026)</h2>
