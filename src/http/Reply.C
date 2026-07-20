@@ -407,6 +407,14 @@ bool Reply::nextBuffers(std::vector<asio::const_buffer>& result)
           && configuration_.compression()
           && request_.acceptGzipEncoding()
           && (cl == -1)
+          /*
+           * We don't want to initialize gzip for a 101 Switching
+           * Protocols because this will become a WebSocket connection.
+           * If we initialize gzip, here, all subsequent WebSocket
+           * frames will be fully compressed (not just the data), which
+           * is equivalent to sending gibberish to the client.
+           */
+          && status_ != switching_protocols
           && mime_types::canCompress(ct);
 
         if (gzipEncoding_) {
