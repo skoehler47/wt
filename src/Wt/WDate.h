@@ -89,6 +89,13 @@ public:
    */
   WDate(int year, int month, int day);
 
+  WDate(const WDate& other);
+  WDate& operator=(const WDate& other);
+  WDate(WDate&& other) noexcept;
+  WDate& operator=(WDate&& other) noexcept;
+
+  ~WDate();
+
   /*! \brief Sets the date by year, month, and day.
    *
    * The \p month has range 1-12 and the \p day has range 1-31.
@@ -156,31 +163,31 @@ public:
    *
    * \sa isValid(), WDate()
    */
-  bool isNull() const { return ymd_ == 0; }
+  bool isNull() const;
 
   /*! \brief Returns if this date is valid.
    *
    * \sa isNull(), WDate(int, int, int), setDate()
    */
-  bool isValid() const { return ymd_ != 0 && ymd_ != 1; }
+  bool isValid() const;
 
   /*! \brief Returns the year.
    *
    * Returns 0 if the date is invalid.
    */
-  int year() const { return (ymd_ >> 16); }
+  int year() const;
 
   /*! \brief Returns the month (1-12).
    *
    * Returns 0 if the date is invalid.
    */
-  int month() const { return (ymd_ >> 8) & 0xFF; }
+  int month() const;
 
   /*! \brief Returns the day of month (1-31).
    *
    * Returns 0 if the date is invalid.
    */
-  int day() const { return ymd_ & 0xFF; }
+  int day() const;
 
   /*! \brief Returns the day of week (1-7).
    *
@@ -459,9 +466,9 @@ public:
   static RegExpInfo formatToRegExp(const WT_USTRING& format);
 
 private:
-  int ymd_;
-
-  void setYmd(int year, int month, int day);
+  struct Impl;
+  // PIMPL idiom to avoid exposing the date library in c++ 17.
+  std::unique_ptr<Impl> pimpl_;
 
   struct ParseState {
     int d, M, y;

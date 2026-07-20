@@ -25,11 +25,14 @@ namespace {
 }
 
 namespace Wt {
+  struct WDate::Impl {
+    date::year_month_day ymd_;
+  };
 
 LOGGER("WDate");
 
 WDate::WDate()
-  : ymd_(0)
+  : pimpl_(nullptr)
 { }
 
 WDate::WDate(const std::chrono::system_clock::time_point& tp)
@@ -50,14 +53,41 @@ WDate::WDate(int year, int month, int day)
   setDate(year, month, day);
 }
 
+WDate::WDate(const WDate& other)
+  : pimpl_(other.pimpl_ ? std::make_unique<Impl>(*other.pimpl_) : nullptr)
+{ }
+
+WDate& WDate::operator=(const WDate& other)
+{
+  if (this != &other) {
+    pimpl_ = other.pimpl_ ? std::make_unique<Impl>(*other.pimpl_) : nullptr;
+  }
+  return *this;
+}
+
+WDate::WDate(WDate&& other) noexcept
+  : pimpl_(std::move(other.pimpl_))
+{ }
+
+WDate& WDate::operator=(WDate&& other) noexcept
+{
+  if (this != &other) {
+    pimpl_ = std::move(other.pimpl_);
+  }
+  return *this;
+}
+
+WDate::~WDate() = default;
+
 void WDate::setTimePoint(const std::chrono::system_clock::time_point& tp)
 {
   date::sys_days dp = date::floor<date::days>(tp);
-  auto ymd = date::year_month_day(dp);
-  if(ymd.ok())
-      setYmd((int)ymd.year(), (unsigned int)ymd.month(), (unsigned int)ymd.day());
-  else
-      ymd_ = 1; //not null and not valid
+  //ymd_ = std::make_unique<date::year_month_day>(dp);
+  if (!pimpl_) {
+    pimpl_ = std::make_unique<Impl>();
+  }
+
+  pimpl_->ymd_ = date::year_month_day(dp);
 }
 
 WDate WDate::addDays(int ndays) const
@@ -104,30 +134,49 @@ WDate WDate::addYears(int nyears) const
       return WDate();
 }
 
-void WDate::setDate(int year, int month, int day)
+bool WDate::isNull() const
 {
-    date::year_month_day ymd = date::day(day)/month/year;
-    if(!ymd.ok()){
-        if(!ymd.year().ok())
-            LOG_WARN("Invalid date: year not in range "
-                     << (int)ymd.year().min()<< " .. "
-                     << (int)ymd.year().max());
-        if(!ymd.month().ok())
-            LOG_WARN("Invalid date: month not in range 1 .. 12");
-        if(!ymd.day().ok())
-            LOG_WARN("Invalid date: day not in range 1 .. 31");
-        ymd_ = 1;
-        return;
-    }
-    setYmd(year, month, day);
+  return !pimpl_;
 }
 
-void WDate::setYmd(int y, int m, int d)
+bool WDate::isValid() const
 {
-  ymd_ = static_cast<int>(
-      (static_cast<unsigned>(y) << 16) |
-      ((static_cast<unsigned>(m) & 0xFF) << 8) |
-       (static_cast<unsigned>(d) & 0xFF));
+  return pimpl_ && pimpl_->ymd_.ok();
+}
+
+int WDate::year() const
+{
+  return (isValid() ? static_cast<int>(pimpl_->ymd_.year()) : 0);
+}
+
+int WDate::month() const
+{
+  return (isValid() ? static_cast<int>(static_cast<unsigned int>(pimpl_->ymd_.month())) : 0);
+}
+
+int WDate::day() const
+{
+  return (isValid() ? static_cast<int>(static_cast<unsigned int>(pimpl_->ymd_.day())) : 0);
+}
+
+void WDate::setDate(int year, int month, int day)
+{
+    if (!pimpl_) {
+        pimpl_ = std::make_unique<Impl>();
+    }
+    date::year_month_day ymd = date::day(day)/month/year;
+
+    pimpl_->ymd_ = ymd;
+    if(!pimpl_->ymd_.ok()){
+        if(!pimpl_->ymd_.year().ok())
+            LOG_WARN("Invalid date: year not in range "
+                     << (int)pimpl_->ymd_.year().min()<< " .. "
+                     << (int)pimpl_->ymd_.year().max());
+        if(!pimpl_->ymd_.month().ok())
+            LOG_WARN("Invalid date: month not in range 1 .. 12");
+        if(!pimpl_->ymd_.day().ok())
+            LOG_WARN("Invalid date: day not in range 1 .. 31");
+    }
 }
 
 bool WDate::isLeapYear(int year)
@@ -168,8 +217,7 @@ int WDate::toJulianDay() const
 std::chrono::system_clock::time_point WDate::toTimePoint() const
 {
   if (isValid()){
-    date::year_month_day ymd = date::day(day())/month()/year();
-    date::sys_days days = ymd;
+    date::sys_days days = pimpl_->ymd_;
     return days;
   }
   else
@@ -199,7 +247,11 @@ bool WDate::operator> (const WDate& other) const
 
 bool WDate::operator< (const WDate& other) const
 {
-  return ymd_ < other.ymd_;
+  return (isNull() && !other.isNull()) ||
+         (!isValid() && other.isValid()) ||
+         (isValid() &&
+          other.isValid() &&
+          pimpl_->ymd_ < other.pimpl_->ymd_);
 }
 
 bool WDate::operator!= (const WDate& other) const
@@ -209,7 +261,10 @@ bool WDate::operator!= (const WDate& other) const
 
 bool WDate::operator== (const WDate& other) const
 {
-  return ymd_ == other.ymd_;
+  return (isNull() && other.isNull()) ||
+         (!isNull() && !other.isNull() &&
+           (pimpl_->ymd_ == other.pimpl_->ymd_ ||
+           (!pimpl_->ymd_.ok() && !other.pimpl_->ymd_.ok())));
 }
 
 bool WDate::operator<= (const WDate& other) const
