@@ -183,6 +183,7 @@ IF(ENABLE_LIBWTTEST)
       dbo/AuthDboTest.C
       dbo/DboTestCompositeKey.C
       auth/PasswordServiceTest.C
+      auth/TotpProcessTest.C
       private/DboImplTest.C
     )
 

@@ -148,7 +148,9 @@ namespace Wt {
     if (mfaThrottle() && throttle) {
       throttlingDelay_ = mfaThrottle()->delayForNextAttempt(login().user());
       if (throttlingDelay_ > 0) {
-        validation = false;
+        update(view, throttle);
+        authenticated_.emit(AuthenticationResult(AuthenticationStatus::Failure, WString::tr("Wt.Auth.totp-code-info-throttle")));
+        return;
       }
     }
 
@@ -160,10 +162,8 @@ namespace Wt {
     }
 
     if (!validation) {
-      if (throttlingDelay_ > 0) {
-        update(view, throttle);
-        authenticated_.emit(AuthenticationResult(AuthenticationStatus::Failure, WString::tr("Wt.Auth.totp-code-info-throttle")));
-        return;
+      if (mfaThrottle() && throttle) {
+        throttlingDelay_ = mfaThrottle()->delayForNextAttempt(login().user());
       }
 
       update(view, throttle);
