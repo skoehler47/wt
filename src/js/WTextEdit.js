@@ -133,8 +133,8 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
         //   WT.px(e, "paddingRight");
         my += WT.pxComputedStyle(e, "borderTopWidth") +
           WT.pxComputedStyle(e, "borderBottomWidth") +
-          WT.px(e, "paddingTop") +
-          WT.px(e, "paddingBottom");
+          WT.pxComputedStyle(e, "paddingTop") +
+          WT.pxComputedStyle(e, "paddingBottom");
       }
 
       e.style.height = (h - my) + "px";
@@ -207,7 +207,9 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
       if (!staticStyle) {
         topLevel.style.position = e.style.position;
         topLevel.style.left = e.style.left;
+        topLevel.style.insetInlineStart = e.style.insetInlineStart;
         topLevel.style.top = e.style.top;
+        topLevel.style.insetBlockStart = e.style.insetBlockStart;
 
         if (!staticStyle && other) {
           other.style.width = (w) + "px";
