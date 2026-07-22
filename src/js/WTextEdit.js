@@ -126,9 +126,6 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
     if (iframe) {
       let my = 0;
 
-      // mx = WT.px(e, "marginLeft") + WT.px(e, "marginRight");
-      my = WT.px(e, "marginTop") + WT.px(e, "marginBottom");
-
       if (!WT.boxSizing(e)) {
         // mx += WT.px(e, "borderLeftWidth") +
         //   WT.px(e, "borderRightWidth") +
@@ -188,6 +185,11 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
 
         h -= 1;
       }
+
+      topLevel.style.marginInlineStart = getComputedStyle(e).marginInlineStart;
+      topLevel.style.marginInlineEnd = getComputedStyle(e).marginInlineEnd;
+      topLevel.style.marginBlockStart = getComputedStyle(e).marginBlockStart;
+      topLevel.style.marginBlockEnd = getComputedStyle(e).marginBlockEnd;
 
       if (tinymce.EditorManager.majorVersion < 5 && h < 0) {
         if (badHeightCount < 10) {
