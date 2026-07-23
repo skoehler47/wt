@@ -85,6 +85,9 @@ public:
    * The \p month has range 1-12 and the \p day has range 1-31.
    * When the date is invalid, isValid() is set to \c false.
    *
+   * The \p year has range [-32767, 32767]. Setting a year outside this
+   * range has undefined behavior.
+   *
    * \sa setDate(), year(), month(), day()
    */
   WDate(int year, int month, int day);
@@ -100,6 +103,9 @@ public:
    *
    * The \p month has range 1-12 and the \p day has range 1-31.
    * When the new date is invalid, isValid() will return \c false.
+   *
+   * The \p year has range [-32767, 32767]. Setting a year outside this
+   * range has undefined behavior.
    *
    * \sa WDate(int year, int month, int day), year(), month(), day()
    */
@@ -117,6 +123,9 @@ public:
    *
    * Returns a null date if the current date is invalid or the new
    * date is out of range.
+   *
+   * \note The \p year has range [-32767, 32767]. If the resulting date
+   *       has a year outside this range, the behavior is undefined.
    *
    * \sa addMonths(), addYears()
    */
@@ -136,6 +145,9 @@ public:
    * Returns a null date if the current date is invalid or the new
    * date is out of range.
    *
+   * \note The \p year has range [-32767, 32767]. If the resulting date
+   *       has a year outside this range, the behavior is undefined.
+   *
    * \sa addDays(), addYears()
    */
   WDate addMonths(int nmonths) const;
@@ -152,6 +164,9 @@ public:
    *
    * Returns a null date if the current date is invalid or the new
    * date is out of range.
+   *
+   * \note The \p year has range [-32767, 32767]. If the resulting date
+   *       has a year outside this range, the behavior is undefined.
    *
    * \sa addDays(), addMonths()
    */
