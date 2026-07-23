@@ -6,6 +6,8 @@
  */
 #include <boost/test/unit_test.hpp>
 
+#include <web/DomElement.h>
+
 #include <Wt/Test/WTestEnvironment.h>
 
 #include <Wt/Chart/WAxisSliderWidget.h>
@@ -40,6 +42,7 @@
 #include <Wt/WSlider.h>
 #include <Wt/WSpinBox.h>
 #include <Wt/WSplitButton.h>
+#include <Wt/WStackedWidget.h>
 #include <Wt/WTable.h>
 #include <Wt/WTableView.h>
 #include <Wt/WTabWidget.h>
@@ -82,6 +85,26 @@ public:
 namespace {
   // RapidXML does not take a copy. The object needs to be alive at point of printing.
   std::vector<std::string> replacedStrings;
+
+  class TestTemplate : public Wt::WTemplate {
+  public:
+    using Wt::WTemplate::WTemplate;
+
+    void updateDom(Wt::DomElement& element)
+    {
+      Wt::WTemplate::updateDom(element, false);
+    }
+  };
+
+  class TestMenu : public Wt::WMenu {
+  public:
+    using Wt::WMenu::WMenu;
+
+    bool hasPendingRerender() const
+    {
+      return needRerender();
+    }
+  };
 }
 
 void filterOutIdAndName(Wt::rapidxml::xml_node<char>* node)
@@ -786,3 +809,39 @@ BOOST_AUTO_TEST_CASE(WTemplate_renderTemplateText_condition_false)
   BOOST_REQUIRE(output.str() == "<div></div>");
 }
 
+BOOST_AUTO_TEST_CASE(WTemplate_unrender_clears_composite_updates)
+{
+  Wt::Test::WTestEnvironment testEnv;
+  Wt::WApplication app(testEnv);
+
+  TestTemplate t("${<if:show-menu>}${menu}${</if:show-menu>}${stack}");
+  t.setCondition("if:show-menu", true);
+
+  auto stack = std::make_unique<Wt::WStackedWidget>();
+  auto stackPtr = stack.get();
+  auto menu = std::make_unique<TestMenu>(stackPtr);
+  auto menuPtr = menu.get();
+  auto submenu = std::make_unique<TestMenu>(stackPtr);
+  auto submenuPtr = submenu.get();
+  submenu->addItem("Subitem", std::make_unique<Wt::WText>("Content"));
+  menu->addMenu("Item", std::move(submenu));
+
+  t.bindWidget("menu", std::move(menu));
+  t.bindWidget("stack", std::move(stack));
+  std::unique_ptr<Wt::DomElement> initialDom(t.createSDomElement(&app));
+
+  auto addedSubmenu = std::make_unique<TestMenu>(stackPtr);
+  addedSubmenu->addItem("Added subitem",
+                       std::make_unique<Wt::WText>("Added content"));
+  menuPtr->addMenu("Added item", std::move(addedSubmenu));
+  BOOST_REQUIRE(menuPtr->hasPendingRerender());
+  BOOST_REQUIRE(submenuPtr->hasPendingRerender());
+
+  t.setCondition("if:show-menu", false);
+  std::unique_ptr<Wt::DomElement> updateDom(
+    Wt::DomElement::getForUpdate(t.id(), Wt::DomElementType::DIV));
+  t.updateDom(*updateDom);
+
+  BOOST_CHECK(!menuPtr->hasPendingRerender());
+  BOOST_CHECK(!submenuPtr->hasPendingRerender());
+}

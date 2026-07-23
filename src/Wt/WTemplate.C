@@ -576,6 +576,9 @@ void WTemplate::unrenderWidget(WWidget *w, DomElement &el)
   else
     el.callJavaScript(removeJs, true);
   w->webWidget()->setRendered(false);
+  // We need to call renderOk() in case w is not w->webWidget(),
+  // otherwise w may still be flagged for rerendering.
+  w->renderOk();
 }
 
 std::string WTemplate::encode(const std::string& text) const

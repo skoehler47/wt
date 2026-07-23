@@ -2409,6 +2409,9 @@ void WWebWidget::setRendered(bool rendered)
     iterateChildren
       ([](WWidget *c) {
         c->webWidget()->setRendered(false);
+        // We need to call renderOk() in case c is not c->webWidget(),
+        // otherwise c may still be flagged for re-rendering.
+        c->renderOk();
       });
   }
 }
