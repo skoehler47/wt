@@ -19,57 +19,59 @@
 
 using namespace Wt;
 
-class TestUser;
-typedef Auth::Dbo::AuthInfo<TestUser> AuthInfo;
-typedef Wt::Dbo::collection<Wt::Dbo::ptr<TestUser>> TestUsers;
+namespace {
+  class TestUser;
+  typedef Auth::Dbo::AuthInfo<TestUser> AuthInfo;
+  typedef Wt::Dbo::collection<Wt::Dbo::ptr<TestUser>> TestUsers;
 
-class TestUser : public Wt::Dbo::Dbo<TestUser>
-{
-public:
-  TestUser() { }
-
-  Wt::Dbo::collection<Wt::Dbo::ptr<AuthInfo>> authInfos;
-
-  template<class Action>
-  void persist(Action& a)
+  class TestUser : public Wt::Dbo::Dbo<TestUser>
   {
-    Wt::Dbo::hasMany(a, authInfos, Wt::Dbo::ManyToOne, "user");
-  }
-};
+  public:
+    TestUser() { }
 
-typedef Auth::Dbo::UserDatabase<AuthInfo> UserDatabase;
+    Wt::Dbo::collection<Wt::Dbo::ptr<AuthInfo>> authInfos;
 
-struct PasswordDboFixture : DboFixtureBase
-{
-  PasswordDboFixture()
-    : DboFixtureBase()
+    template<class Action>
+    void persist(Action& a)
+    {
+      Wt::Dbo::hasMany(a, authInfos, Wt::Dbo::ManyToOne, "user");
+    }
+  };
+
+  typedef Auth::Dbo::UserDatabase<AuthInfo> UserDatabase;
+
+  struct PasswordDboFixture : DboFixtureBase
   {
-    myAuthService_ = std::make_unique<Auth::AuthService>();
-    myPasswordService_ = std::make_unique<Auth::PasswordService>(*myAuthService_);
+    PasswordDboFixture()
+      : DboFixtureBase()
+    {
+      myAuthService_ = std::make_unique<Auth::AuthService>();
+      myPasswordService_ = std::make_unique<Auth::PasswordService>(*myAuthService_);
 
-    session_->mapClass<TestUser>("user");
-    session_->mapClass<AuthInfo>("auth_info");
-    session_->mapClass<AuthInfo::AuthIdentityType>("auth_identity");
-    session_->mapClass<AuthInfo::AuthTokenType>("auth_token");
+      session_->mapClass<TestUser>("user");
+      session_->mapClass<AuthInfo>("auth_info");
+      session_->mapClass<AuthInfo::AuthIdentityType>("auth_identity");
+      session_->mapClass<AuthInfo::AuthTokenType>("auth_token");
 
-    users_ = std::make_unique<UserDatabase>(*session_);
+      users_ = std::make_unique<UserDatabase>(*session_);
 
-    try {
+      try {
+        Wt::Dbo::Transaction transaction(*session_);
+        session_->dropTables();
+      } catch (...) {
+      }
+
       Wt::Dbo::Transaction transaction(*session_);
-      session_->dropTables();
-    } catch (...) {
+      session_->createTables();
+      transaction.commit();
     }
 
-    Wt::Dbo::Transaction transaction(*session_);
-    session_->createTables();
-    transaction.commit();
-  }
+    std::unique_ptr<Auth::AuthService> myAuthService_;
+    std::unique_ptr<Auth::PasswordService> myPasswordService_;
 
-  std::unique_ptr<Auth::AuthService> myAuthService_;
-  std::unique_ptr<Auth::PasswordService> myPasswordService_;
-
-  std::unique_ptr<UserDatabase> users_;
-};
+    std::unique_ptr<UserDatabase> users_;
+  };
+}
 
 BOOST_AUTO_TEST_CASE( throttle_not_enabled_test )
 {
