@@ -418,7 +418,9 @@ void WPopupMenu::setAdjust(WFlags<Orientation> adjustOrientations)
 
   adjustFlags_ = adjustOrientations;
   refresh();
-  scheduleRerender(true);
+  if (isRendered()) {
+    scheduleRerender(true);
+  }
 }
 
 }

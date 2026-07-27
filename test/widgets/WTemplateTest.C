@@ -844,4 +844,14 @@ BOOST_AUTO_TEST_CASE(WTemplate_unrender_clears_composite_updates)
 
   BOOST_CHECK(!menuPtr->hasPendingRerender());
   BOOST_CHECK(!submenuPtr->hasPendingRerender());
+
+  auto addedSubmenu2 = std::make_unique<TestMenu>(stackPtr);
+  addedSubmenu2->addItem("Added subitem2",
+                        std::make_unique<Wt::WText>("Added content2"));
+  menuPtr->addMenu("Added item2", std::move(addedSubmenu2));
+
+  t.updateDom(*updateDom);
+
+  BOOST_CHECK(!menuPtr->hasPendingRerender());
+  BOOST_CHECK(!submenuPtr->hasPendingRerender());
 }

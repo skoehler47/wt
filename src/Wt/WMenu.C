@@ -572,7 +572,9 @@ void WMenu::render(WFlags<RenderFlag> flags)
 void WMenu::updateSelectionEvent()
 {
   needSelectionEventUpdate_ = true;
-  scheduleRender();
+  if (isRendered()) {
+    scheduleRender();
+  }
 }
 
 int WMenu::count() const
