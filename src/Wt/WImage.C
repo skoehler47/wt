@@ -211,7 +211,7 @@ void WImage::updateDom(DomElement& element, bool all)
   if (flags_.test(BIT_IMAGE_LINK_CHANGED) || all) {
     std::string url;
     WApplication *app = WApplication::instance();
-    if (!alternativeBotUrl().empty() && app->environment().agentIsSpiderBot()) {
+    if (!alternativeBotUrl().empty() && app->environment().treatLikeBot()) {
       url = resolveRelativeUrl(alternativeBotUrl());
     } else if (!imageLink_.isNull()) {
       url = resolveRelativeUrl(imageLink_.url());

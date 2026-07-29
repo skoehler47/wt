@@ -359,7 +359,7 @@ void WResource::setAlternativeBotUrl(const std::string& url)
     botUrl_ = url;
 
     WApplication *app = WApplication::instance();
-    if (app && app->environment().agentIsSpiderBot()) {
+    if (app && app->environment().treatLikeBot()) {
       if (wasEmpty) {
         app->removeExposedResource(this);
       }

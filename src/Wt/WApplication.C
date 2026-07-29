@@ -420,7 +420,7 @@ WApplication::~WApplication()
 
 #ifndef WT_TARGET_JAVA
   Configuration& conf = env().server()->configuration();
-  if (conf.servePrivateResourcesToBots() && env().agentIsSpiderBot()) {
+  if (conf.servePrivateResourcesToBots() && env().treatLikeBot()) {
     exposeBotResources();
   }
   // Fix issue #5331: if WTimer is a child of WApplication,
@@ -959,7 +959,7 @@ std::string WApplication::addExposedResource(WResource *resource)
 
   Configuration& conf = env().server()->configuration();
 
-  if (conf.servePrivateResourcesToBots() && env().agentIsSpiderBot()) {
+  if (conf.servePrivateResourcesToBots() && env().treatLikeBot()) {
     std::string appUrl = session_->applicationUrl();
     if (appUrl == "/") {
       appUrl.clear();

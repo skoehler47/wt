@@ -403,7 +403,7 @@ void WebSession::setState(State state, int timeout)
 
 std::string WebSession::sessionQuery() const
 {
-  std::string wtd = env_->agentIsSpiderBot() ? "bot" : sessionId_;
+  std::string wtd = env_->treatLikeBot() ? "bot" : sessionId_;
   std::string result ="?wtd=" + DomElement::urlEncodeS(wtd);
   if (type() == EntryPointType::WidgetSet)
     result += "&wtt=widgetset";
