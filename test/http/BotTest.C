@@ -14,6 +14,8 @@
 
 #include "Wt/WAnchor.h"
 #include "Wt/WContainerWidget.h"
+#include "Wt/WImage.h"
+#include "Wt/WLink.h"
 #include "Wt/WResource.h"
 #include "Wt/WServer.h"
 #include "Wt/WText.h"
@@ -58,7 +60,11 @@ namespace {
   const std::string hiddenInput = "<input id=\"Wt-history-field\" type=\"hidden\"/>";
   const std::string postForm = "<form method='post'";
 
-  const std::string botResourceMessage = "This is a bot resource.";
+  const std::string botResourceNormalMessage = "This is a resource for normal users.";
+  const std::string botResourceBotMessage = "This is a resource for bots.";
+
+  const std::string normalImageUrl = "https://www.normalimage.com";
+  const std::string botImageUrl = "https://www.botimage.com";
 
   class Server : public WServer
   {
@@ -166,6 +172,21 @@ namespace {
   };
 
   class BotResource: public Wt::WResource {
+  private:
+    class BotOnlyResource : public Wt::WResource {
+    public:
+      virtual ~BotOnlyResource() {
+        beingDeleted();
+      }
+
+      void handleRequest(const Wt::Http::Request& request,
+                         Wt::Http::Response& response) override {
+        response.setStatus(200);
+        response.setMimeType("text/plain");
+        response.out() << botResourceBotMessage;
+      }
+    };
+
   public:
     virtual ~BotResource() {
       beingDeleted();
@@ -175,11 +196,11 @@ namespace {
                        Wt::Http::Response& response) override {
       response.setStatus(200);
       response.setMimeType("text/plain");
-      response.out() << botResourceMessage;
+      response.out() << botResourceNormalMessage;
     }
 
     std::shared_ptr<WResource> botResource() override {
-      return std::make_shared<BotResource>();
+      return std::make_shared<BotOnlyResource>();
     }
   };
 
@@ -191,6 +212,16 @@ namespace {
       auto resource = std::make_shared<BotResource>();
       root()->addWidget(std::make_unique<WAnchor>(WLink(resource), "Bot Resource Link"));
       resourceUrl = resource->url();
+    }
+  };
+
+  class BotImageApp : public WApplication {
+  public:
+    BotImageApp(const WEnvironment& env)
+      : WApplication(env)
+    {
+      auto image = root()->addNew<WImage>(WLink(normalImageUrl));
+      image->setAlternativeBotUrl(botImageUrl);
     }
   };
 }
@@ -1238,5 +1269,179 @@ BOOST_AUTO_TEST_CASE( bot_access_private_resource_on_bot_resources_allowed )
 
   BOOST_TEST(!client.err());
   BOOST_TEST(client.message().status() == 200);
-  BOOST_TEST(client.message().body() == botResourceMessage);
+  BOOST_TEST(client.message().body() == botResourceBotMessage);
+}
+
+BOOST_AUTO_TEST_CASE( suspected_bot_access_private_resource_on_bot_resources_allowed )
+{
+  Server server(true);
+  server.configuration().setBootstrapMethod(Configuration::BootstrapMethod::Progressive);
+
+  std::string resourceUrl;
+  bool hasApplicationStarted = false;
+  bool isBotUser = false;
+  bool treatLikeBot = false;
+  server.addEntryPoint(EntryPointType::Application,
+                       [&] (const WEnvironment& env) {
+                         hasApplicationStarted = true;
+                         isBotUser = env.agentIsSpiderBot();
+                         treatLikeBot = env.treatLikeBot();
+                         return std::make_unique<BotResourceApp>(env, resourceUrl);
+                       });
+
+  BOOST_REQUIRE(server.start());
+
+  // create application
+  Client client;
+  std::vector<Http::Message::Header> headers = {{ "User-Agent", "Regular Agent" }};
+  client.get("http://" + server.address() + "/?wtd=0123456789101213", headers);
+  client.waitDone();
+
+  BOOST_REQUIRE(!isBotUser);
+  BOOST_REQUIRE(treatLikeBot);
+  BOOST_REQUIRE(hasApplicationStarted);
+
+  if (!resourceUrl.empty() && resourceUrl[0] != '/') {
+    resourceUrl = "/" + resourceUrl;
+  }
+  resourceUrl = "http://" + server.address() + resourceUrl;
+
+  client.get(resourceUrl, headers);
+  client.waitDone();
+
+  BOOST_TEST(!client.err());
+  BOOST_TEST(client.message().status() == 200);
+  BOOST_TEST(client.message().body() == botResourceBotMessage);
+}
+
+BOOST_AUTO_TEST_CASE( non_bot_access_private_resource_on_bot_resources_allowed )
+{
+  Server server(true);
+  server.configuration().setBootstrapMethod(Configuration::BootstrapMethod::Progressive);
+
+  std::string resourceUrl;
+  bool hasApplicationStarted = false;
+  bool treatLikeBot = false;
+  server.addEntryPoint(EntryPointType::Application,
+                       [&] (const WEnvironment& env) {
+                         hasApplicationStarted = true;
+                         treatLikeBot = env.treatLikeBot();
+                         return std::make_unique<BotResourceApp>(env, resourceUrl);
+                       });
+
+  BOOST_REQUIRE(server.start());
+
+  // create application
+  Client client;
+  std::vector<Http::Message::Header> headers = {{ "User-Agent", "Regular Agent" }};
+  client.get("http://" + server.address(), headers);
+  client.waitDone();
+
+  BOOST_REQUIRE(!treatLikeBot);
+  BOOST_REQUIRE(hasApplicationStarted);
+
+  if (!resourceUrl.empty() && resourceUrl[0] != '/') {
+    resourceUrl = "/" + resourceUrl;
+  }
+  resourceUrl = "http://" + server.address() + resourceUrl;
+
+  client.get(resourceUrl, headers);
+  client.waitDone();
+
+  BOOST_TEST(!client.err());
+  BOOST_TEST(client.message().status() == 200);
+  BOOST_TEST(client.message().body() == botResourceNormalMessage);
+}
+
+BOOST_AUTO_TEST_CASE( non_bot_receives_image )
+{
+  Server server(true);
+  server.configuration().setBootstrapMethod(Configuration::BootstrapMethod::Progressive);
+
+  bool hasApplicationStarted = false;
+  bool treatLikeBot = false;
+  server.addEntryPoint(EntryPointType::Application,
+                       [&] (const WEnvironment& env) {
+                         hasApplicationStarted = true;
+                         treatLikeBot = env.treatLikeBot();
+                         return std::make_unique<BotImageApp>(env);
+                       });
+
+  BOOST_REQUIRE(server.start());
+
+  // create application
+  Client client;
+  std::vector<Http::Message::Header> headers = {{ "User-Agent", "Regular Agent" }};
+  client.get("http://" + server.address(), headers);
+  client.waitDone();
+
+  BOOST_REQUIRE(!treatLikeBot);
+  BOOST_REQUIRE(hasApplicationStarted);
+
+  BOOST_TEST(client.message().status() == 200);
+  BOOST_TEST(client.message().body().find(normalImageUrl) != std::string::npos);
+  BOOST_TEST(client.message().body().find(botImageUrl) == std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE( suspected_bot_receives_image )
+{
+  Server server(true);
+  server.configuration().setBootstrapMethod(Configuration::BootstrapMethod::Progressive);
+
+  bool hasApplicationStarted = false;
+  bool isBotUser = false;
+  bool treatLikeBot = false;
+  server.addEntryPoint(EntryPointType::Application,
+                       [&] (const WEnvironment& env) {
+                         hasApplicationStarted = true;
+                         isBotUser = env.agentIsSpiderBot();
+                         treatLikeBot = env.treatLikeBot();
+                         return std::make_unique<BotImageApp>(env);
+                       });
+
+  BOOST_REQUIRE(server.start());
+
+  // create application
+  Client client;
+  std::vector<Http::Message::Header> headers = {{ "User-Agent", "Regular Agent" }};
+  client.get("http://" + server.address() + "/?wtd=0123456789101213", headers);
+  client.waitDone();
+
+  BOOST_REQUIRE(!isBotUser);
+  BOOST_REQUIRE(treatLikeBot);
+  BOOST_REQUIRE(hasApplicationStarted);
+
+  BOOST_TEST(client.message().status() == 200);
+  BOOST_TEST(client.message().body().find(normalImageUrl) == std::string::npos);
+  BOOST_TEST(client.message().body().find(botImageUrl) != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE( bot_receives_image )
+{
+  Server server(true);
+  server.configuration().setBootstrapMethod(Configuration::BootstrapMethod::Progressive);
+
+  bool hasApplicationStarted = false;
+  bool isBotUser = false;
+  server.addEntryPoint(EntryPointType::Application,
+                       [&] (const WEnvironment& env) {
+                         hasApplicationStarted = true;
+                         isBotUser = env.agentIsSpiderBot();
+                         return std::make_unique<BotImageApp>(env);
+                       });
+
+  BOOST_REQUIRE(server.start());
+
+  // create application
+  Client client;
+  std::vector<Http::Message::Header> headers = {{ "User-Agent", "somebot" }};
+  client.get("http://" + server.address(), headers);
+  client.waitDone();
+
+  BOOST_REQUIRE(isBotUser);
+  BOOST_REQUIRE(hasApplicationStarted);
+
+  BOOST_TEST(client.message().status() == 200);
+  BOOST_TEST(client.message().body().find(normalImageUrl) == std::string::npos);
+  BOOST_TEST(client.message().body().find(botImageUrl) != std::string::npos);
 }
