@@ -522,10 +522,22 @@ if (!window._$_WT_CLASS_$_) {
     };
 
     this.remove = function(id) {
-      const e = WT.getElement(id);
+      let e = WT.getElement(id);
       if (e) {
         WT.saveReparented(e);
-        e.parentNode.removeChild(e);
+
+        // ensure we remove wrappers as well.
+        let parent = e.parentNode;
+        while (
+          parent.classList.contains("Wt-justify-wrap") ||
+          parent.classList.contains("Wt-fill-width") ||
+          parent.classList.contains("Wt-fill-height")
+        ) {
+          e = parent;
+          parent = e.parentNode;
+        }
+
+        parent.removeChild(e);
       }
     };
 
