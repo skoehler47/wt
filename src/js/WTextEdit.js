@@ -218,6 +218,11 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
         if (other) {
           other.style.height = (h) + "px";
           topLevel.style.height = e.style.height;
+        } else if (tinymce.EditorManager.majorVersion >= 5) {
+          // TinyMCE 5+ sizes the editor container itself (defaulting to at
+          // least 400px), so it must be resized explicitly, just like in the
+          // static case, or it can never become smaller (e.g. in a layout).
+          topLevel.style.height = saveh + "px";
         }
       } else {
         if (tinymce.EditorManager.majorVersion < 5) {
