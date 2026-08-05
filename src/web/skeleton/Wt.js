@@ -1989,11 +1989,12 @@ if (!window._$_WT_CLASS_$_) {
       }
 
       const op = e.offsetParent;
-      if (!op) {
+      if (!op && !useAnchor) {
         return;
       }
 
-      const offsetParent = WT.widgetPageCoordinates(op);
+      // offsetParent is not used with anchor positioning.
+      const offsetParent = useAnchor ? null : WT.widgetPageCoordinates(op);
 
       if (x + reserveWidth > windowX + windowSize.x) {
         // too far right, chose other side
@@ -2133,7 +2134,9 @@ if (!window._$_WT_CLASS_$_) {
         rightx,
         bottomy;
 
-      w.style.position = "absolute";
+      const useAnchor = WT.useAnchorPosition(w);
+
+      w.style.position = useAnchor ? "fixed" : "absolute";
       if (WT.css(w, "display") === "none") {
         w.style.display = "block";
       }
@@ -2157,7 +2160,6 @@ if (!window._$_WT_CLASS_$_) {
       let p, pp = atw;
       w.parentNode.removeChild(w);
       const isPopup = w.classList.contains("Wt-popup");
-      const useAnchor = WT.useAnchorPosition(w);
 
       for (p = pp.parentNode; !p.classList.contains("Wt-domRoot"); p = p.parentNode) {
         if (p.wtReparentBarrier) {
