@@ -26,8 +26,8 @@ WT_DECLARE_WT_MEMBER(
 
     function newPos() {
       if (movedSignal) {
-        const newx = WT.pxself(el, "left");
-        const newy = WT.pxself(el, "top");
+        const newx = WT.pxComputedStyle(el, "left");
+        const newy = WT.pxComputedStyle(el, "top");
         if (newx !== x || newy !== y) {
           x = newx;
           y = newy;
