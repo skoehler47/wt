@@ -736,7 +736,7 @@ void WebController::handleRequest(WebRequest *request)
   if (conf_.sessionTracking() == Configuration::Combined)
     multiSessionCookie = sessionFromCookie(request->headerValue("Cookie"),
                                            "ms" + request->scriptName(),
-                                           conf_.sessionIdLength());
+                                           conf_.fullSessionIdLength());
 
   if (sessionId.empty() && wtdE) {
     sessionId = *wtdE;
