@@ -20,45 +20,11 @@ newer version of Wt. It lists changes in the library that may break
 the way you build Wt, the way you configure Wt or the Wt API and
 behaviour.
 
-<h2>Release 4.14.1 (TBD)</h2>
+<h2>Release 4.14.1 (August 6, 2026)</h2>
 
 <p>Wt 4.14.1 is a patch release that addresses the following issues:</p>
 
 <ul>
-  <li>
-    <a href="https://redmine.emweb.be/issues/13654" target="_blank">Issue #13654</a>:
-    fixed a JavaScript error when adding a submenu to a
-    <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a> that had been
-    removed from the page by a
-    <a href="classWt_1_1WTemplate.html" target="_blank">WTemplate</a> condition.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14667" target="_blank">Issue #14667</a>:
-    fixed a use-after-free that could happen at the destruction of a session.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14677" target="_blank">Issue #14677</a>:
-    fixed
-    <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a> selection sometimes not propagating their selection
-    correctly to the top-most menu.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14685" target="_blank">Issue #14685</a>:
-    fixed
-    <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> ignoring the offsets.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14691" target="_blank">Issue #14691</a>:
-    fixed
-    <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> not correctly
-    handling margins, especially when in a layout with
-    <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">LayoutImplementation::JavaScript</a>.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14663" target="_blank">Issue #14663</a>:
-    Fixed
-    <a href="classWt_1_1WDate.html" target="_blank">WDate</a> incorrectly handling negative years.
-  </li>
   <li>
     <a href="https://redmine.emweb.be/issues/14672" target="_blank">Issue #14672</a>:
     fixed web-socket not working when compression was enabled due to all of their messages being fully compressed.
@@ -72,8 +38,42 @@ behaviour.
     Additionally, fixed the throttle time shown to the user when trying to enter the TOTP code being smaller than it actually is.
   </li>
   <li>
+    <a href="https://redmine.emweb.be/issues/14677" target="_blank">Issue #14677</a>:
+    fixed
+    <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a> selection sometimes not propagating their selection
+    correctly to the top-most menu.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/13654" target="_blank">Issue #13654</a>:
+    fixed a JavaScript error when adding a submenu to a
+    <a href="classWt_1_1WMenu.html" target="_blank">WMenu</a> that had been
+    removed from the page by a
+    <a href="classWt_1_1WTemplate.html" target="_blank">WTemplate</a> condition.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14691" target="_blank">Issue #14691</a>:
+    fixed
+    <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> not correctly
+    handling margins, especially when in a layout with
+    <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">LayoutImplementation::JavaScript</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14685" target="_blank">Issue #14685</a>:
+    fixed
+    <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> ignoring the offsets.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14663" target="_blank">Issue #14663</a>:
+    Fixed
+    <a href="classWt_1_1WDate.html" target="_blank">WDate</a> incorrectly handling negative years.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14667" target="_blank">Issue #14667</a>:
+    fixed a use-after-free that could happen at the destruction of a session.
+  </li>
+  <li>
     <a href="https://redmine.emweb.be/issues/14704" target="_blank">Issue #14704</a>:
-    fixed suspicious get requests not being treated as bot requests by some features
+    fixed suspicious get requests not being treated as bot requests by some features,
     when it should.
   </li>
 </ul>
