@@ -169,6 +169,14 @@ void WPopupMenu::popup(WWidget *location, Orientation orientation)
   doJavaScript(jsRef() + ".wtObj.popupAt("
                + location->jsRef() + ");");
 
+  setOffsets(WLength::Auto, Side::Top | Side::Left);
+  doJavaScript(jsRef() + ".style.left="
+               + jsRef() + ".style.right="
+               + jsRef() + ".style.top="
+               + jsRef() + ".style.bottom="
+               + jsRef() + ".style.insetInlineStart="
+               + jsRef() + ".style.insetBlockStart='';");
+
   if (adjustFlags_ == AllOrientations) {
     anchorAt(location, orientation);
   } else {

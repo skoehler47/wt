@@ -77,6 +77,7 @@ IF(ENABLE_LIBWTTEST)
     widgets/WDialogTest.C
     widgets/WGroupBoxTest.C
     widgets/WMenuTest.C
+    widgets/WPopupMenuTest.C
     widgets/WSpinBoxTest.C
     widgets/WStackedWidgetTest.C
     widgets/WTemplateTest.C
