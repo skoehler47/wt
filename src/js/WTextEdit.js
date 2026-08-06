@@ -141,10 +141,19 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
 
       let topLevel, other;
 
+      const parent = el.parentElement,
+        grandparent = parent ? parent.parentElement : null;
+      const flexLayout = (parent && parent.classList.contains("Wt-fill-width")) ||
+        (grandparent && grandparent.classList.contains("Wt-fill-height"));
       const position = el.style.position;
-      const staticStyle = position !== "absolute" &&
-        position !== "relative" &&
-        position !== "fixed";
+      const staticStyle = flexLayout ||
+        (position !== "absolute" &&
+          position !== "relative" &&
+          position !== "fixed");
+
+      // In a flex layout, the editor container must remain static and fill the
+      // available space. Inline dimensions on the widget are preferred layout
+      // sizes, not its final dimensions.
 
       if (tinymce.EditorManager.majorVersion < 4) {
         const row = iframe.parentNode.parentNode,
@@ -153,7 +162,9 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
         other = tbl;
         topLevel = tbl.parentNode;
 
-        if (!staticStyle && typeof w !== "undefined") {
+        if (staticStyle) {
+          topLevel.style.width = "100%";
+        } else if (typeof w !== "undefined") {
           topLevel.style.width = (w - 2) + "px";
         }
 
@@ -175,7 +186,9 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
 
         topLevel = container.parentNode;
 
-        if (!staticStyle && typeof w !== "undefined") {
+        if (staticStyle) {
+          topLevel.style.width = "100%";
+        } else if (typeof w !== "undefined") {
           topLevel.style.width = (w - 2) + "px";
         }
 
@@ -236,7 +249,7 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
           topLevel.style.position = "static";
           topLevel.style.display = "block";
         } else {
-          topLevel.style.height = saveh + "px";
+          topLevel.style.height = "100%";
         }
       }
 
