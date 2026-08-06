@@ -120,13 +120,13 @@ enum class TemplateWidgetIdMode {
  * Functions are resolved by resolveFunction(), and the default implementation
  * considers functions bound with addFunction().
  * There are currently three functions that are generally useful:
- * - \link Functions::tr\endlink : resolves a localized strings, this is
+ * - \link Functions::tr \endlink : resolves a localized strings, this is
  *   convenient to create a language neutral template, which contains
  *   translated strings
- * - \link Functions::id\endlink : resolves the id of a bound widget, this
+ * - \link Functions::id \endlink : resolves the id of a bound widget, this
  *   is convenient to bind &lt;label&gt; elements to a form widget using its
  *   for attribute.
- * - \link Functions::block\endlink : recursively renders another string as
+ * - \link Functions::block \endlink : recursively renders another string as
  *   macro block optional arguments substituted before processing template
  *   substitution.
  *
