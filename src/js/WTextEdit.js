@@ -141,7 +141,10 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
 
       let topLevel, other;
 
-      const staticStyle = el.style.position !== "absolute";
+      const position = el.style.position;
+      const staticStyle = position !== "absolute" &&
+        position !== "relative" &&
+        position !== "fixed";
 
       if (tinymce.EditorManager.majorVersion < 4) {
         const row = iframe.parentNode.parentNode,
@@ -207,9 +210,9 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
       if (!staticStyle) {
         topLevel.style.position = e.style.position;
         topLevel.style.left = e.style.left;
-        topLevel.style.insetInlineStart = e.style.insetInlineStart;
+        topLevel.style.insetInlineStart = getComputedStyle(e).insetInlineStart;
         topLevel.style.top = e.style.top;
-        topLevel.style.insetBlockStart = e.style.insetBlockStart;
+        topLevel.style.insetBlockStart = getComputedStyle(e).insetBlockStart;
 
         if (!staticStyle && other) {
           other.style.width = (w) + "px";
@@ -222,6 +225,10 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WTextEdit", function(APP, el, ex
           // TinyMCE 5+ sizes the editor container itself (defaulting to at
           // least 400px), so it must be resized explicitly, just like in the
           // static case, or it can never become smaller (e.g. in a layout).
+          topLevel.style.height = saveh + "px";
+        }
+
+        if (tinymce.EditorManager.majorVersion >= 5) {
           topLevel.style.height = saveh + "px";
         }
       } else {
