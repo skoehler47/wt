@@ -1944,8 +1944,9 @@ if (!window._$_WT_CLASS_$_) {
      * bottom of (y) or top from (bottomy)
      */
     this.fitToWindow = function(e, x, y, rightx, bottomy, adjustX = true, adjustY = true) {
-      const hsides = ["left", "right"],
-        vsides = ["top", "bottom"];
+      const rtl = getComputedStyle(e).direction === "rtl";
+      const hsides = rtl ? ["insetInlineEnd", "insetInlineStart"] : ["insetInlineStart", "insetInlineEnd"],
+        vsides = ["insetBlockStart", "insetBlockEnd"];
 
       const useAnchor = WT.useAnchorPosition(e);
 

@@ -48,6 +48,60 @@ WT_DECLARE_WT_MEMBER(
       }
     }
 
+    /*
+     * When a dialog is positioned using anchor(), WT.pxComputedStyle()
+     * may not return the correct value for the inset properties when
+     * the position-anchor is used. This function ensures that the
+     * correct values are returned for the inset properties, regardless
+     * of whether the position-anchor is used or not.
+     */
+    function getInsets(widget) {
+      const widgetStyle = window.getComputedStyle(widget);
+      const isFixed = widgetStyle.position === "fixed";
+      const widgetRect = widget.getBoundingClientRect();
+
+      const marginTop = WT.pxComputedStyle(widget, "marginTop") || 0;
+      const marginBottom = WT.pxComputedStyle(widget, "marginBottom") || 0;
+      const marginLeft = WT.pxComputedStyle(widget, "marginLeft") || 0;
+      const marginRight = WT.pxComputedStyle(widget, "marginRight") || 0;
+
+      let parentRect;
+      let borderLeft = 0, borderTop = 0, borderRight = 0, borderBottom = 0;
+
+      if (isFixed) {
+        parentRect = {
+          top: 0,
+          left: 0,
+          bottom: document.documentElement.clientHeight,
+          right: document.documentElement.clientWidth,
+        };
+      } else {
+        const containingBlock = widget.offsetParent;
+        parentRect = containingBlock.getBoundingClientRect();
+
+        borderLeft = WT.pxComputedStyle(containingBlock, "borderLeftWidth") || 0;
+        borderTop = WT.pxComputedStyle(containingBlock, "borderTopWidth") || 0;
+        borderRight = WT.pxComputedStyle(containingBlock, "borderRightWidth") || 0;
+        borderBottom = WT.pxComputedStyle(containingBlock, "borderBottomWidth") || 0;
+      }
+
+      // Calculate margin-box offsets relative to containing block's padding-box
+      const top = (widgetRect.top - (parentRect.top + borderTop)) - marginTop;
+      const bottom = ((parentRect.bottom - borderBottom) - widgetRect.bottom) - marginBottom;
+      const left = (widgetRect.left - (parentRect.left + borderLeft)) - marginLeft;
+      const right = ((parentRect.right - borderRight) - widgetRect.right) - marginRight;
+
+      // Resolve logical direction (LTR vs RTL)
+      const isRTL = widgetStyle.direction === "rtl";
+      const inlineStart = isRTL ? right : left;
+      const inlineEnd = isRTL ? left : right;
+
+      const blockStart = top;
+      const blockEnd = bottom;
+
+      return { blockStart, blockEnd, inlineStart, inlineEnd };
+    }
+
     function handleMove(event) {
       const e = event || window.event;
       const nowxy = WT.pageCoordinates(e);
@@ -55,31 +109,45 @@ WT_DECLARE_WT_MEMBER(
       const wsize = WT.windowSize();
 
       if (wxy.x > 0 && wxy.x < wsize.x && wxy.y > 0 && wxy.y < wsize.y) {
+        const insets = getInsets(el);
         centerX = centerY = false;
 
-        const rtl = document.body.classList.contains("Wt-rtl");
-        const useRight = rtl ?
-          !(el.style.left === "auto" || el.style.left === "") :
-          el.style.right === "auto" || el.style.right === "";
+        const sign = document.body.classList.contains("Wt-rtl") ? -1 : 1;
+        const useEnd = el.style.insetInlineEnd === "auto" || el.style.insetInlineEnd === "";
 
-        if (useRight) {
-          el.style.left = (WT.px(el, "left") + nowxy.x - dsx) + "px";
-          el.style.right = rtl ? "auto" : "";
+        if (useEnd) {
+          el.style.insetInlineStart = (insets.inlineStart + sign * (nowxy.x - dsx)) + "px";
+          el.style.insetInlineEnd = "auto";
         } else {
-          el.style.right = (WT.px(el, "right") + dsx - nowxy.x) + "px";
-          el.style.left = rtl ? "" : "auto";
+          el.style.insetInlineEnd = (insets.inlineEnd + sign * (dsx - nowxy.x)) + "px";
+          el.style.insetInlineStart = "auto";
         }
 
-        if (el.style.bottom === "auto" || el.style.bottom === "") {
-          el.style.top = (WT.px(el, "top") + nowxy.y - dsy) + "px";
-          el.style.bottom = "";
+        if (el.style.insetBlockEnd === "auto" || el.style.insetBlockEnd === "") {
+          el.style.insetBlockStart = (insets.blockStart + nowxy.y - dsy) + "px";
+          el.style.insetBlockEnd = "auto";
         } else {
-          el.style.bottom = (WT.px(el, "bottom") + dsy - nowxy.y) + "px";
-          el.style.top = "auto";
+          el.style.insetBlockEnd = (insets.blockEnd + dsy - nowxy.y) + "px";
+          el.style.insetBlockStart = "auto";
         }
 
         dsx = nowxy.x;
         dsy = nowxy.y;
+
+        /*
+         * Chrome does sometimes move the dialog relative to the
+         * its position-anchor when it was previously positioned
+         * relative to that position-anchor. This is a workaround to
+         * ensure that the dialog is positioned correctly before the
+         * next mousemove event is processed.
+         */
+        if (el.style.positionAnchor !== "") {
+          const anchor = el.style.positionAnchor;
+          el.style.positionAnchor = "";
+          setTimeout(function() {
+            el.style.positionAnchor = anchor;
+          }, 0);
+        }
       }
     }
 
