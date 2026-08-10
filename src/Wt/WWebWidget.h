@@ -458,6 +458,7 @@ private:
   static const int BIT_FOCUS_CONNECTED = 43;
   static const int BIT_POSITION_ANCHOR_NAME_CHANGED = 44;
   static const int BIT_POSITION_ANCHOR_CHANGED = 45;
+  static const int BIT_OFFSETS_CHANGED = 46;
 
 
   static const char *FOCUS_SIGNAL;
@@ -470,7 +471,7 @@ private:
   std::string positionAnchorName_;
 
 #ifndef WT_TARGET_JAVA
-  static const std::bitset<46> AllChangeFlags;
+  static const std::bitset<47> AllChangeFlags;
 #endif // WT_TARGET_JAVA
 
   void loadToolTip();
@@ -478,7 +479,7 @@ private:
   /*
    * Frequently used attributes.
    */
-  std::bitset<46> flags_;
+  std::bitset<47> flags_;
   std::unique_ptr<WLength> width_;
   std::unique_ptr<WLength> height_;
 

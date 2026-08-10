@@ -61,7 +61,7 @@ const int WWebWidget::Z_INDEX_INCREMENT = 1100;
 bool WWebWidget::defaultNativeControl_ = false;
 
 #ifndef WT_TARGET_JAVA
-const std::bitset<46> WWebWidget::AllChangeFlags = std::bitset<46>()
+const std::bitset<47> WWebWidget::AllChangeFlags = std::bitset<47>()
   .set(BIT_FLEX_BOX_CHANGED)
   .set(BIT_HIDDEN_CHANGED)
   .set(BIT_GEOMETRY_CHANGED)
@@ -78,7 +78,8 @@ const std::bitset<46> WWebWidget::AllChangeFlags = std::bitset<46>()
   .set(BIT_SCROLL_VISIBILITY_CHANGED)
   .set(BIT_OBJECT_NAME_CHANGED)
   .set(BIT_POSITION_ANCHOR_NAME_CHANGED)
-  .set(BIT_POSITION_ANCHOR_CHANGED);
+  .set(BIT_POSITION_ANCHOR_CHANGED)
+  .set(BIT_OFFSETS_CHANGED);
 #endif // WT_TARGET_JAVA
 
 WWebWidget::TransientImpl::TransientImpl()
@@ -608,6 +609,7 @@ void WWebWidget::setOffsets(const WLength& offset, WFlags<Side> sides)
     layoutImpl_->offsets_[3] = offset;
 
   flags_.set(BIT_GEOMETRY_CHANGED);
+  flags_.set(BIT_OFFSETS_CHANGED);
 
   repaint();
 }
@@ -1578,7 +1580,8 @@ void WWebWidget::updateDom(DomElement& element, bool all)
       /*
        * set offsets
        */
-      if (layoutImpl_->positionScheme_ != PositionScheme::Static) {
+      if (layoutImpl_->positionScheme_ != PositionScheme::Static &&
+          (flags_.test(BIT_OFFSETS_CHANGED) || all)) {
         static const Property properties[] = { Property::StyleInsetBlockStart,
                                                Property::StyleInsetInlineEnd,
                                                Property::StyleInsetBlockEnd,
@@ -1599,6 +1602,8 @@ void WWebWidget::updateDom(DomElement& element, bool all)
               element.setProperty(property, layoutImpl_->offsets_[i].cssText());
           }
         }
+
+        flags_.reset(BIT_OFFSETS_CHANGED);
       }
 
       /*
@@ -2384,6 +2389,7 @@ void WWebWidget::propagateRenderOk(bool deep)
   flags_.reset(BIT_PARENT_CHANGED);
   flags_.reset(BIT_POSITION_ANCHOR_NAME_CHANGED);
   flags_.reset(BIT_POSITION_ANCHOR_CHANGED);
+  flags_.reset(BIT_OFFSETS_CHANGED);
 #endif
 
   renderOk();
