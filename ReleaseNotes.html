@@ -26,6 +26,12 @@ behaviour.
 
 <ul>
   <li>
+    <a href="https://redmine.emweb.be/issues/14660" target="_blank">Issue #14660</a>:
+    fixed
+    <a href="classWt_1_1Dbo_1_1FixedSqlConnectionPool.html" target="_blank">Wt::Dbo::FixedSqlConnectionPool</a> not always correctly
+    waking up threads waiting for a connection when a connection was returned to the pool, that could lead to a deadlock.
+  </li>
+  <li>
     <a href="https://redmine.emweb.be/issues/14437" target="_blank">Issue #14437</a>:
     fixed layouts with
     <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">Wt::LayoutImplementation::Flex</a>
