@@ -97,15 +97,16 @@ void FixedSqlConnectionPool::handleTimeout()
 
 void FixedSqlConnectionPool::returnConnection(std::unique_ptr<SqlConnection> connection)
 {
+  {
 #ifdef WT_THREADED
-  std::unique_lock<std::mutex> lock(impl_->mutex);
+    std::unique_lock<std::mutex> lock(impl_->mutex);
 #endif // WT_THREADED
 
-  impl_->freeList.push_back(std::move(connection));
+    impl_->freeList.push_back(std::move(connection));
+  }
 
 #ifdef WT_THREADED
-  if (impl_->freeList.size() == 1)
-    impl_->connectionAvailable.notify_one();
+  impl_->connectionAvailable.notify_one();
 #endif // WT_THREADED
 }
 

@@ -183,6 +183,7 @@ IF(ENABLE_LIBWTTEST)
       dbo/JsonTest2.C
       dbo/AuthDboTest.C
       dbo/DboTestCompositeKey.C
+      dbo/FixedConnectionPoolTest.C
       auth/PasswordServiceTest.C
       auth/TotpProcessTest.C
       private/DboImplTest.C
