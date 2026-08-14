@@ -525,6 +525,7 @@ if (!window._$_WT_CLASS_$_) {
       let e = WT.getElement(id);
       if (e) {
         WT.saveReparented(e);
+        WT.beforeRemove(e);
 
         // ensure we remove wrappers as well.
         let parent = e.parentNode;
@@ -538,6 +539,12 @@ if (!window._$_WT_CLASS_$_) {
         }
 
         parent.removeChild(e);
+      }
+    };
+
+    this.beforeRemove = function(tv) {
+      if (tv && tv.wtObj && tv.wtObj.beforeRemove) {
+        tv.wtObj.beforeRemove();
       }
     };
 

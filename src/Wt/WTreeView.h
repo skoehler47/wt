@@ -240,6 +240,7 @@ public:
 protected:
   virtual void render(WFlags<RenderFlag> flags) override;
   virtual void enableAjax() override;
+  std::string renderRemoveJs(bool recursive) override;
 
 private:
   typedef std::unordered_map<WModelIndex, WTreeViewNode *> NodeMap;

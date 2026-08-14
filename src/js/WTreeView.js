@@ -30,6 +30,15 @@ WT_DECLARE_WT_MEMBER(
     }
     APP.treeViewRegistered.push(self);
 
+    this.beforeRemove = function() {
+      if (APP.treeViewRegistered) {
+        const index = APP.treeViewRegistered.indexOf(self);
+        if (index !== -1) {
+          APP.treeViewRegistered.splice(index, 1);
+        }
+      }
+    };
+
     let sizeSet = false;
     let scrollBarColumn = null;
 

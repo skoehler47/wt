@@ -1585,6 +1585,15 @@ void WTreeView::enableAjax()
   WAbstractItemView::enableAjax();
 }
 
+std::string WTreeView::renderRemoveJs(bool recursive)
+{
+  std::string res = recursive ?
+    WT_CLASS ".beforeRemove(" + jsRef() + ");" :
+    ""; // Already handled by WT.remove (in Wt.js)
+
+  return res + WAbstractItemView::renderRemoveJs(recursive);
+}
+
 void WTreeView::rerenderTree()
 {
   WContainerWidget *wrapRoot
