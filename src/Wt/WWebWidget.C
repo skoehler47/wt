@@ -2103,8 +2103,11 @@ void WWebWidget::updateDom(DomElement& element, bool all)
   if (all || flags_.test(BIT_POSITION_ANCHOR_CHANGED)) {
     if (!positionAnchor().empty()) {
       if (layoutImpl_->anchorOrientations_.empty()) {
-        element.removeProperty(Property::StylePositionArea);
-        element.removeProperty(Property::StylePositionTryFallbacks);
+        if (!all) {
+          // ensure that we remove those properties
+          element.setProperty(Property::StylePositionArea, "");
+          element.setProperty(Property::StylePositionTryFallbacks, "");
+        }
       } else {
         WStringStream anchorArea;
         if (layoutImpl_->anchorOrientations_.test(Orientation::Vertical)) {
@@ -2125,7 +2128,10 @@ void WWebWidget::updateDom(DomElement& element, bool all)
 
       element.setProperty(Property::StylePositionAnchor, positionAnchor());
     } else {
-      element.removeProperty(Property::StylePositionAnchor);
+      if (flags_.test(BIT_POSITION_ANCHOR_CHANGED)) {
+        // ensure that we remove that property
+        element.setProperty(Property::StylePositionAnchor, "");
+      }
       element.removeProperty(Property::StylePositionArea);
       element.removeProperty(Property::StylePositionTryFallbacks);
     }
