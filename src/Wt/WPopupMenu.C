@@ -206,6 +206,9 @@ void WPopupMenu::popup(const WPoint& p)
 {
   popupImpl();
 
+  // Make sure any previous position anchor is cleared.
+  setPositionAnchor("");
+
   // make sure we are not confused by client-side being positioned properly
   setOffsets(42, Side::Left | Side::Top);
   setOffsets(-10000, Side::Left | Side::Top);

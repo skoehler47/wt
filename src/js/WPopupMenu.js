@@ -318,7 +318,6 @@ WT_DECLARE_WT_MEMBER(1, JavaScriptConstructor, "WPopupMenu", function(APP, el, g
         document.addEventListener("keydown", onDocumentKeyDown);
       }, 0);
       el.style.display = "block";
-      el.style.position = "fixed";
     }
 
     setOthersInactive(el, null);

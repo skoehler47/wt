@@ -2110,6 +2110,7 @@ if (!window._$_WT_CLASS_$_) {
 
       if (!WT.isHidden(w)) {
         w.style.display = "block";
+        w.style.position = "absolute";
         WT.fitToWindow(w, x, y, x, y, adjustX, adjustY);
       }
     };
