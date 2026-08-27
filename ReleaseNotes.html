@@ -20,49 +20,17 @@ newer version of Wt. It lists changes in the library that may break
 the way you build Wt, the way you configure Wt or the Wt API and
 behaviour.
 
-<h2>Release 4.14.2 (TBD)</h2>
+<h2>Release 4.14.2 (August 27, 2026)</h2>
 
 <p>Wt 4.14.2 is a patch release that addresses the following issues:</p>
 
 <ul>
   <li>
-    <a href="https://redmine.emweb.be/issues/14660" target="_blank">Issue #14660</a>:
+    <a href="https://redmine.emweb.be/issues/14614" target="_blank">Issue #14614</a>:
     fixed
-    <a href="classWt_1_1Dbo_1_1FixedSqlConnectionPool.html" target="_blank">Wt::Dbo::FixedSqlConnectionPool</a> not always correctly
-    waking up threads waiting for a connection when a connection was returned to the pool, that could lead to a deadlock.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14437" target="_blank">Issue #14437</a>:
-    fixed layouts with
-    <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">Wt::LayoutImplementation::Flex</a>
-    not correctly removing some wrappers when removing a widget from itself.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14597" target="_blank">Issue #14597</a>:
-    fixed endless page reloads when using session id prefixes with <code>Combined</code> session
-    tracking method.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14712" target="_blank">Issue #14712</a>:
-    fixed
-    <a href="classWt_1_1WDialog.html#ac092840d5ce4ac38198a15a8ddda5e87" target="_blank">WDialog::moved()</a> signal
-    sometimes being emitted with an incorrect x coordinate when being moved by something else than the user.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14475" target="_blank">Issue #14475</a>:
-    fixed
-    <a href="classWt_1_1WDialog.html" target="_blank">WDialog</a> sometimes moving for no reason, or teleporting
-    to the wrong position when being moved by the user.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14596" target="_blank">Issue #14596</a>:
-    fixed incorrect handling, on the client side, of url parameters containing <code>=</code> as part of their value.
-  </li>
-  <li>
-    <a href="https://redmine.emweb.be/issues/14744" target="_blank">Issue #14744</a>:
-    fixed JavaScript error sometimes happening when resizing or adding a
-    <a href="classWt_1_1WTreeView.html" target="_blank">WTreeView</a> after another one had
-    been removed.
+    <a href="classWt_1_1WWidget.html#af0df90fe8bbcb42dd057f8c1f1835b49" target="_blank">WWidget::positionAt()</a>
+    sometimes not correctly positioning the widget, especially when the widget it was positioned at
+    was inside of another popup.
   </li>
   <li>
     <a href="https://redmine.emweb.be/issues/14716" target="_blank">Issue #14716</a>:
@@ -72,19 +40,36 @@ behaviour.
     popped up at a point.
   </li>
   <li>
-    <a href="https://redmine.emweb.be/issues/14614" target="_blank">Issue #14614</a>:
-    fixed
-    <a href="classWt_1_1WWidget.html#af0df90fe8bbcb42dd057f8c1f1835b49" target="_blank">WWidget::positionAt()</a>
-    sometimes not correctly positioning the widget, especially when the widget it was positioned at
-    was inside of another popup.
-  </li>
-  <li>
     <a href="https://redmine.emweb.be/issues/14767" target="_blank">Issue #14767</a>:
     fixed
     <a href="classWt_1_1WPopupMenu.html#a9da2dff4c6de6845a5a15b1a7c22572c" target="_blank">WPopupMenu::popup(WPoint)</a> (and therefore
     <a href="classWt_1_1WPopupMenu.html#a8b63c8824aa820d8d3669e563b6f57f4" target="_blank">WPopupMenu::popup(WMouseEvent)</a>)
     not changing the position of the
     <a href="classWt_1_1WPopupMenu.html" target="_blank">WPopupMenu</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14475" target="_blank">Issue #14475</a>:
+    fixed
+    <a href="classWt_1_1WDialog.html" target="_blank">WDialog</a> sometimes moving for no reason, or teleporting
+    to the wrong position when being moved by the user.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14712" target="_blank">Issue #14712</a>:
+    fixed
+    <a href="classWt_1_1WDialog.html#ac092840d5ce4ac38198a15a8ddda5e87" target="_blank">WDialog::moved()</a> signal
+    sometimes being emitted with an incorrect x coordinate when being moved by something else than the user.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14660" target="_blank">Issue #14660</a>:
+    fixed
+    <a href="classWt_1_1Dbo_1_1FixedSqlConnectionPool.html" target="_blank">Wt::Dbo::FixedSqlConnectionPool</a> not always correctly
+    waking up threads waiting for a connection when a connection was returned to the pool. This could lead to a deadlock.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14744" target="_blank">Issue #14744</a>:
+    fixed JavaScript error sometimes happening when resizing or adding a
+    <a href="classWt_1_1WTreeView.html" target="_blank">WTreeView</a> after another one had
+    been removed.
   </li>
   <li>
     <a href="https://redmine.emweb.be/issues/14714" target="_blank">Issue #14714</a>:
@@ -105,7 +90,22 @@ behaviour.
     fixed
     <a href="classWt_1_1WTextEdit.html" target="_blank">WTextEdit</a> not filling the
     available width and height when in a layout using
-    <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">Wt::LayoutImplementation::Flex</a>.
+    <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">LayoutImplementation::Flex</a>.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14437" target="_blank">Issue #14437</a>:
+    fixed layouts with
+    <a href="namespaceWt.html#aeb0e4f49ce4a28d8ce9b0c6005027876" target="_blank">LayoutImplementation::Flex</a>
+    not correctly removing some wrappers when removing a widget from itself.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14597" target="_blank">Issue #14597</a>:
+    fixed endless page reloads when using session id prefixes with <code>Combined</code> session
+    tracking method.
+  </li>
+  <li>
+    <a href="https://redmine.emweb.be/issues/14596" target="_blank">Issue #14596</a>:
+    fixed incorrect handling, on the client side, of url parameters containing <code>=</code> as part of their value.
   </li>
 </ul>
 
