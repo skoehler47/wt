@@ -388,6 +388,10 @@ public:
   WDropEvent(WObject *source, const std::string& mimeType,
              const WTouchEvent& touchEvent);
 
+  /*! \brief Destructor.
+   */
+  ~WDropEvent();
+
 #ifndef WT_TARGET_JAVA
   WDropEvent(const WDropEvent &other);
   WDropEvent &operator=(const WDropEvent &other);

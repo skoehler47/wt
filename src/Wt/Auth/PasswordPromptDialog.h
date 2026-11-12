@@ -50,6 +50,10 @@ public:
    */
   PasswordPromptDialog(Login& login, const std::shared_ptr<AuthModel>& model);
 
+  /*! \brief Destructor.
+   */
+  ~PasswordPromptDialog();
+
   /*! \brief Sets the multi-factor authentication process.
    *
    * Adds a multi-factor authentication process that will be used

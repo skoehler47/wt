@@ -28,6 +28,10 @@ OAuthWidget::OAuthWidget(const OAuthService& oAuthService)
   process_->authenticated().connect(this, &OAuthWidget::oAuthDone);
 }
 
+OAuthWidget::~OAuthWidget() {
+  /* defined here due to incomplete types in header */
+}
+
 void OAuthWidget::oAuthDone(const Identity& identity)
 {
   authenticated_.emit(process_.get(), identity);
