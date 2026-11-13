@@ -66,6 +66,10 @@ PasswordPromptDialog
   }
 }
 
+PasswordPromptDialog::~PasswordPromptDialog() {
+  /* defined here due to incomplete types in header */
+}
+
 void PasswordPromptDialog::setMfaProcess(std::unique_ptr<Mfa::AbstractMfaProcess> mfaProcess)
 {
   mfaProcess_ = std::move(mfaProcess);

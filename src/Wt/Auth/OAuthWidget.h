@@ -18,6 +18,7 @@ class WT_API OAuthWidget : public WImage
 {
 public:
   OAuthWidget(const OAuthService& oAuthService);
+  ~OAuthWidget();
 
   Signal<OAuthProcess *, Identity>& authenticated() { return authenticated_; }
 

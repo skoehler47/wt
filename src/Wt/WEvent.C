@@ -357,6 +357,10 @@ WDropEvent::WDropEvent(WObject *source, const std::string& mimeType,
 #endif
 { }
 
+WDropEvent::~WDropEvent() {
+  /* defined here due to incomplete types in header */
+}
+
 #ifndef WT_TARGET_JAVA
 WDropEvent::WDropEvent(const WDropEvent &other)
   : dropSource_(other.dropSource_),
